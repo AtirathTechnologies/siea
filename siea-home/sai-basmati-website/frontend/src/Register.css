@@ -102,8 +102,9 @@ h1 {
 
 /* Error text */
 .error-text {
-  color: #f87171;
-  font-size: 0.8rem;
+  color: #fd0202;
+  background-color: aliceblue;
+  font-size: 1rem;
   margin-top: 5px;
 }
 

@@ -127,23 +127,30 @@ const JoinUs = () => {
 
     // Send to WhatsApp
     const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
-    const message = `
-                  *${type}*
+    const formatKey = (key) =>
+      key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, (str) => str.toUpperCase());
 
-                  *Personal Details:*
-                  Name: ${submissionData.name}
-                  Email: ${submissionData.email}
-                  Phone: ${submissionData.phone}
-                  ${submissionData.company ? `Company: ${submissionData.company}` : ''}
+    const businessDetails = Object.entries(submissionData)
+      .filter(([key]) => !['name', 'email', 'phone', 'company'].includes(key))
+      .map(([key, value]) => `• ${formatKey(key)}: ${value}`)
+      .join('\n');
 
-                  *Business Details:*
-                  ${Object.entries(submissionData)
-        .filter(([key]) => !['name', 'email', 'phone', 'company'].includes(key))
-        .map(([key, value]) => `${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}: ${value}`)
-        .join('\n')}
+    const message =
+      `*${type}*
 
-                  *Submitted On:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                      `.trim();
+*Personal Details*
+• Name: ${submissionData.name}
+• Email: ${submissionData.email}
+• Phone: ${submissionData.phone}
+${submissionData.company ? `• Company: ${submissionData.company}` : ''}
+
+*Business Details*
+${businessDetails}
+
+*Submitted On*
+${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
 
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');

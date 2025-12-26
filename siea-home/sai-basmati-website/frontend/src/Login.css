@@ -124,12 +124,12 @@
 }
 
 .error-message {
-  color: #f87171;
-  font-size: 0.9rem;
+  color: #ff0404;
+  font-size: 1rem;
   text-align: center;
   margin-top: 15px;
   padding: 10px;
-  background-color: rgba(248, 113, 113, 0.1);
+  background-color: rgba(253, 253, 253, 0.854);
   border-radius: 6px;
 }
 

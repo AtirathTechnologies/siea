@@ -29,6 +29,18 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
   const productsContainerRef = useRef(null);
 
 
+  useEffect(() => {
+    if (detailsProduct && productsContainerRef.current) {
+      requestAnimationFrame(() => {
+        productsContainerRef.current.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      });
+    }
+  }, [detailsProduct]);
+
+
 
 
 
@@ -67,11 +79,6 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
     });
     return () => unsubscribe();
   }, []);
-
-
-
-
-
 
   // Filtering
   useEffect(() => {
@@ -178,10 +185,10 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
         <div
           ref={productsContainerRef}
           className={`products-container flex-1 transition-all duration-300 p-4 ${detailsProduct
-              ? 'details-open'
-              : isSidebarOpen
-                ? 'sidebar-open'
-                : ''
+            ? 'details-open'
+            : isSidebarOpen
+              ? 'sidebar-open'
+              : ''
             }`}
         >
 
@@ -204,15 +211,8 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
               }}
               onViewDetails={(prod) => {
                 setDetailsProduct(prod);
-
-                // 🔥 SCROLL THE CONTAINER, NOT WINDOW
-                requestAnimationFrame(() => {
-                  productsContainerRef.current?.scrollTo({
-                    top: 0,
-                    behavior: "smooth",
-                  });
-                });
               }}
+
 
               getConversionRate={getConversionRate}
               getCurrencySymbol={getCurrencySymbol}

@@ -167,6 +167,7 @@ export default function Orders() {
       setOrders(prev => prev.map(o => o.id === viewingOrder.id ? { ...o, status: updateStatus, updatedAt: Date.now() } : o));
       setShowUpdateModal(false);
       setViewingOrder(null);
+      notifyAdminModal(false);
       alert(`Order status updated to: ${updateStatus}`);
     } catch (err) {
       console.error("Failed to update status:", err);

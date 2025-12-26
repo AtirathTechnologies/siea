@@ -72,7 +72,8 @@ export const logHistory = async ({
   entity,
   action,
   before = null,
-  after = null
+  after = null,
+  changes = []   // ✅ ADD THIS
 }) => {
   const actor = resolveActor();
 
@@ -82,6 +83,7 @@ export const logHistory = async ({
     action,
     before,
     after,
+    changes,      // ✅ STORE CHANGES
     actor: actor.email,
     actorUid: actor.uid,
     actorRole: actor.role,

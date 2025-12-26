@@ -75,20 +75,20 @@ export default function ProductsAdmin() {
       setEditing("new");
       setForm({ ...emptyProduct });
 
-      // ✅ scroll to top smoothly
       setTimeout(() => {
         addFormRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
     }
     else {
       setEditing(product.id);
-      const calculatedPrice = product.grades && product.grades.length > 0
-        ? calculatePriceRange(product.grades)
-        : product.price || "";
+      // Make a fresh copy of the product for editing
+      const productCopy = JSON.parse(JSON.stringify(product));
+      const calculatedPrice = productCopy.grades && productCopy.grades.length > 0
+        ? calculatePriceRange(productCopy.grades)
+        : productCopy.price || "";
 
       setForm({
-        ...product,
-        grades: product.grades || [],
+        ...productCopy,
         price: calculatedPrice
       });
 
@@ -97,6 +97,17 @@ export default function ProductsAdmin() {
         [product.id]: true
       }));
     }
+  };
+
+  const getNextProductKey = (products) => {
+    if (!products || products.length === 0) return "1";
+
+    const numericIds = products
+      .map(p => parseInt(p.firebaseKey || p.id))
+      .filter(n => !isNaN(n));
+
+    const maxId = Math.max(...numericIds, 0);
+    return String(maxId + 1);
   };
 
   const updateFormWithGrades = (newGrades) => {
@@ -236,6 +247,12 @@ export default function ProductsAdmin() {
       return;
     }
 
+    // DEEP COPY of the original product BEFORE modifications
+    const originalProduct = JSON.parse(JSON.stringify(
+      products.find(p => p.id === id)
+    ));
+
+    // Prepare the new data
     const finalForm = {
       ...form,
       price: calculatePriceRange(form.grades || []),
@@ -248,7 +265,6 @@ export default function ProductsAdmin() {
 
     try {
       const user = auth.currentUser;
-      const originalProduct = products.find(p => p.id === id);
 
       // Get only changed fields for history
       const changes = getChangedFields(originalProduct, dataToSave);
@@ -257,9 +273,9 @@ export default function ProductsAdmin() {
         path: `products/${firebaseKey}`,
         entity: "PRODUCT",
         action: "UPDATE",
-        before: originalProduct,
-        after: dataToSave,
-        changes: changes, // Store only changes
+        before: originalProduct, // Original unchanged data
+        after: dataToSave, // New modified data
+        changes: changes,
         actor: user?.email || "Unknown",
         actorUid: user?.uid || null,
         actorRole: "admin"
@@ -276,7 +292,7 @@ export default function ProductsAdmin() {
   };
 
   const addProduct = async () => {
-    const newKey = Date.now().toString();
+    const newKey = getNextProductKey(products);
 
     const finalForm = {
       ...form,
@@ -293,8 +309,8 @@ export default function ProductsAdmin() {
         path: `products/${newKey}`,
         entity: "PRODUCT",
         action: "CREATE",
-        before: null,
-        after: finalForm,
+        before: null, // No data before creation
+        after: finalForm, // Only the new data
         actor: user?.email || "Unknown",
         actorUid: user?.uid || null,
         actorRole: "admin"
@@ -313,14 +329,17 @@ export default function ProductsAdmin() {
     if (window.confirm("⚠️ Delete this product permanently?")) {
       try {
         const user = auth.currentUser;
-        const productToDelete = products.find(p => p.firebaseKey === firebaseKey);
+        // DEEP COPY of the product to delete
+        const productToDelete = JSON.parse(JSON.stringify(
+          products.find(p => p.firebaseKey === firebaseKey)
+        ));
 
         await logHistory({
           path: `products/${firebaseKey}`,
           entity: "PRODUCT",
           action: "DELETE",
-          before: productToDelete,
-          after: null,
+          before: productToDelete, // Original product data
+          after: null, // Null after deletion
           actor: user?.email || "Unknown",
           actorUid: user?.uid || null,
           actorRole: "admin"

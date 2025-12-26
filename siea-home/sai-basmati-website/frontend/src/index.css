@@ -425,8 +425,9 @@ label {
 
 /* Error text */
 .error-text {
-  color: #f87171;
-  font-size: 0.85rem;
+  color: #ff0000;
+  font-size: 1rem;
+  background-color: aliceblue;
   margin-top: 4px;
 }
 

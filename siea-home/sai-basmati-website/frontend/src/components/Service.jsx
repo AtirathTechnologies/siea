@@ -94,49 +94,11 @@ const Service = () => {
   const [varietyOptions, setVarietyOptions] = useState([]); // array of strings
   const [gradeMap, setGradeMap] = useState({}); // { varietyName: [ { name, price }, ... ] }
   const [productsRaw, setProductsRaw] = useState([]);
-  // Commented out pincode loading state
-  // const [pincodeLoading, setPincodeLoading] = useState(false);
-  // const [pincodeMessage, setPincodeMessage] = useState("");
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [apiLoading, setApiLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null); // For simplified product selection
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://siea.onrender.com";
-
-  // Commented out pincode fetching function
-  /*
-  const fetchFromBackendLocation = async () => {
-    if (!form.pincode || form.pincode.length < 3) return;
-
-    setPincodeLoading(true);
-    setPincodeMessage("");
-
-    try {
-      const res = await fetch(
-        `${API_BASE_URL}/location?countryCode=${form.countryCode}&pincode=${form.pincode}`
-      );
-
-      const data = await res.json();
-
-      if (data.success) {
-        setForm(prev => ({
-          ...prev,
-          town: data.town || prev.town,
-          city: data.city || prev.city,
-          district: data.district || prev.district,
-        }));
-
-        setPincodeMessage(`Location found: ${data.city || data.town}`);
-      } else {
-        setPincodeMessage(data.message || "Enter manually");
-      }
-    } catch (err) {
-      console.error("Backend location error:", err);
-      setPincodeMessage("Server offline — Enter manually");
-    }
-
-    setPincodeLoading(false);
-  };
-  */
 
   const shippingCharges = {
     india: { airways: 350, train: 250 },
@@ -247,6 +209,11 @@ const Service = () => {
 
         setVarietyOptions(varietiesArr);
         setGradeMap(gmap);
+        
+        // Auto-select first category if available
+        if (varietiesArr.length > 0 && !selectedCategory) {
+          setSelectedCategory(varietiesArr[0]);
+        }
       },
       (err) => {
         console.error("Failed to load products from firebase:", err);
@@ -269,7 +236,7 @@ const Service = () => {
       const kg = qOpt ? qOpt.kg : 1;
       return pricePerKg * kg;
     },
-    [gradeMap] // only change when gradeMap updates
+    [gradeMap]
   );
 
   const calculateTotalRicePrice = useMemo(() => {
@@ -356,12 +323,12 @@ const Service = () => {
   );
 
   // -------------------------
-  // Item selection helpers (toggle / update)
+  // Simplified item selection helpers
   // -------------------------
   const toggleItem = useCallback(
     (variety, grade) => {
       setForm((prev) => {
-        const key = `${variety}:::${grade}`; // safe unique key separator
+        const key = `${variety}:::${grade}`;
         const exists = prev.selectedItems.find((i) => i.key === key);
         if (exists) {
           return { ...prev, selectedItems: prev.selectedItems.filter((i) => i.key !== key) };
@@ -392,6 +359,16 @@ const Service = () => {
     },
     [calculateItemPrice]
   );
+
+  // -------------------------
+  // Remove item from selection
+  // -------------------------
+  const removeItem = useCallback((key) => {
+    setForm((prev) => ({
+      ...prev,
+      selectedItems: prev.selectedItems.filter((item) => item.key !== key),
+    }));
+  }, []);
 
   // -------------------------
   // Persist sample quote (non-blocking)
@@ -643,9 +620,6 @@ const Service = () => {
       });
       setPhoneError("");
       setEmailError("");
-      // Commented out pincode loading reset
-      // setPincodeLoading(false);
-      // setPincodeMessage("");
     }
   }, []);
 
@@ -690,7 +664,7 @@ const Service = () => {
   }, [form.countryCode, convertToLocalCurrency]);
 
   // -------------------------
-  // Render (keeps your classNames / markup identical)
+  // Render with simplified product selection UI
   // -------------------------
   return (
     <>
@@ -892,37 +866,11 @@ const Service = () => {
                           placeholder={form.countryCode === "+44" ? "Postcode (e.g. SW1A 1AA) *" : "Zip / Postal Code *"}
                           value={form.pincode}
                           onChange={handleInputChange}
-                          // Commented out onBlur handler for pincode fetching
-                          // onBlur={fetchFromBackendLocation}
                           maxLength="12"
                           className="tw-w-full tw-px-5 tw-py-4 tw-rounded-xl tw-bg-black/60 tw-text-yellow-100 placeholder:tw-text-yellow-500 tw-border tw-border-yellow-700 focus:tw-ring-4 focus:tw-ring-yellow-400 tw-font-mono"
                         />
                         {form.pincode && form.pincode.length < 4 && form.submitted && <p className="tw-text-red-400 tw-text-xs tw-mt-1">Too short</p>}
                         {!form.pincode && form.submitted && <p className="tw-text-red-400 tw-text-xs tw-mt-1">Required</p>}
-                        
-                        {/* Commented out pincode loading and message display */}
-                        {/* 
-                        {pincodeLoading && (
-                          <div className="tw-flex tw-items-center tw-gap-2 tw-mt-2">
-                            <div className="tw-w-4 tw-h-4 tw-border-2 tw-border-yellow-400 tw-border-t-transparent tw-rounded-full tw-animate-spin"></div>
-                            <p className="tw-text-yellow-300 tw-text-xs">Fetching location…</p>
-                          </div>
-                        )}
-
-                        {pincodeMessage && !pincodeLoading && (
-                          <p
-                            className={`tw-text-xs tw-mt-2 ${pincodeMessage.includes("found")
-                              ? "tw-text-green-400"
-                              : pincodeMessage.includes("Manual")
-                                ? "tw-text-blue-400"
-                                : "tw-text-orange-400"
-                              }`}
-                          >
-                            {pincodeMessage}
-                          </p>
-                        )}
-                        */}
-
                       </div>
                       <div className="sm:tw-col-span-2">
                         <input type="text" name="landmark" placeholder="Landmark / Nearby Place (Optional)" value={form.landmark} onChange={handleInputChange} className="tw-w-full tw-px-5 tw-py-4 tw-rounded-xl tw-bg-black/60 tw-text-yellow-100 placeholder:tw-text-yellow-500 tw-border tw-border-yellow-700 focus:tw-ring-4 focus:tw-ring-yellow-400" />
@@ -931,146 +879,203 @@ const Service = () => {
                     </div>
                   </div>
 
-                  {/* Select Samples & Quantity (from Firebase) */}
+                  {/* SIMPLIFIED: Select Samples & Quantity */}
                   <div className="tw-bg-black/50 tw-backdrop-blur-lg tw-rounded-3xl tw-p-8 tw-border-2 tw-border-yellow-500">
-                    <h5 className="tw-text-2xl tw-font-bold tw-text-yellow-400 tw-mb-8 tw-text-center">Select Samples & Quantity</h5>
-                    <div className="tw-space-y-8">
-                      {varietyOptions.length === 0 && <p className="tw-text-center tw-text-gray-400">Loading product list...</p>}
+                    <h5 className="tw-text-2xl tw-font-bold tw-text-yellow-400 tw-mb-6 tw-text-center">Select Samples & Quantity</h5>
+                    
+                    {/* Category Selection Tabs */}
+                    <div className="tw-mb-8">
+                      <div className="tw-flex tw-flex-wrap tw-gap-3 tw-justify-center">
+                        {varietyOptions.map((category) => (
+                          <button
+                            key={category}
+                            onClick={() => setSelectedCategory(category)}
+                            className={`tw-px-5 tw-py-3 tw-rounded-xl tw-font-semibold tw-transition-all ${
+                              selectedCategory === category
+                                ? "tw-bg-yellow-500 tw-text-black"
+                                : "tw-bg-black/60 tw-text-yellow-300 hover:tw-bg-yellow-600 hover:tw-text-black"
+                            }`}
+                          >
+                            {category}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                      {varietyOptions.map((variety) => {
-                        const localCurrency = convertToLocalCurrency(1);
-                        return (
-                          <div key={variety} className="tw-bg-black/60 tw-backdrop-blur-md tw-rounded-2xl tw-p-6 tw-border tw-border-yellow-600">
-                            <div className="tw-font-bold tw-text-yellow-300 tw-text-xl tw-mb-6">{variety}</div>
-                            <div className="tw-grid tw-grid-cols-1 sm:tw-grid-cols-2 md:tw-grid-cols-3 lg:tw-grid-cols-4 tw-gap-6">
-                              {(gradeMap[variety] || []).map((gradeObj) => {
-                                const gradeName = safeString(gradeObj.name || "Unknown");
-                                const key = `${variety}:::${gradeName}`;
-                                const item = form.selectedItems.find((i) => i.key === key);
-                                const isChecked = !!item;
-                                const pricePerKg = Number(gradeObj.price || 0);
-                                const localPricePerKg = pricePerKg * localCurrency.rate;
-                                
-                                return (
-                                  <div key={`${variety}:::${gradeName}`} className="tw-bg-black/70 tw-backdrop-blur-sm tw-rounded-xl tw-p-5 tw-border tw-border-yellow-700 hover:tw-border-yellow-400 tw-transition-all tw-flex tw-flex-col" style={{ height: "140px" }}>
-                                    <label className="tw-flex tw-items-center tw-gap-4 tw-cursor-pointer tw-mb-3 tw-min-h-10">
-                                      <div className="tw-flex-shrink-0">
-                                        <input type="checkbox" checked={isChecked} onChange={() => toggleItem(variety, gradeName)} className="tw-w-7 tw-h-7 tw-text-yellow-400 tw-bg-black/50 tw-rounded-lg focus:tw-ring-4 focus:tw-ring-yellow-400 tw-border-2 tw-border-yellow-600" />
-                                      </div>
-                                      <div>
-                                        <span className="tw-text-yellow-100 tw-font-semibold tw-text-base tw-leading-tight tw-break-words">{gradeName}</span>
-                                        <p className="tw-text-yellow-400 tw-text-sm">
-                                          ₹{pricePerKg}/kg
-                                          {form.countryCode !== "+91" && (
-                                            <span className="tw-text-blue-300 tw-text-xs tw-block">
-                                              ≈ {localCurrency.symbol}{localPricePerKg.toFixed(2)}/{form.countryCode === "+86" || form.countryCode === "+81" ? "kg" : "kg"}
-                                            </span>
-                                          )}
-                                        </p>
-                                      </div>
-                                    </label>
+                    {/* Products Grid for Selected Category */}
+                    <div className="tw-space-y-6">
+                      {selectedCategory && gradeMap[selectedCategory] && gradeMap[selectedCategory].length > 0 ? (
+                        <div className="tw-grid tw-grid-cols-1 sm:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-6">
+                          {gradeMap[selectedCategory].map((gradeObj, index) => {
+                            const gradeName = safeString(gradeObj.name || "Unknown");
+                            const key = `${selectedCategory}:::${gradeName}`;
+                            const item = form.selectedItems.find((i) => i.key === key);
+                            const isChecked = !!item;
+                            const pricePerKg = Number(gradeObj.price || 0);
+                            const localCurrency = convertToLocalCurrency(1);
+                            const localPricePerKg = pricePerKg * localCurrency.rate;
+                            
+                            return (
+                              <div 
+                                key={`${selectedCategory}-${gradeName}-${index}`} 
+                                className={`tw-rounded-2xl tw-p-5 tw-border-2 tw-transition-all tw-cursor-pointer ${
+                                  isChecked 
+                                    ? "tw-border-yellow-400 tw-bg-yellow-900/30" 
+                                    : "tw-border-yellow-700 tw-bg-black/40 hover:tw-border-yellow-500"
+                                }`}
+                                onClick={() => toggleItem(selectedCategory, gradeName)}
+                              >
+                                <div className="tw-flex tw-items-start tw-justify-between tw-mb-3">
+                                  <div>
+                                    <h6 className="tw-text-lg tw-font-bold tw-text-yellow-200">{gradeName}</h6>
+                                    <p className="tw-text-yellow-400 tw-text-sm">
+                                      ₹{pricePerKg}/kg
+                                      {form.countryCode !== "+91" && (
+                                        <span className="tw-text-blue-300 tw-text-xs tw-block">
+                                          ≈ {localCurrency.symbol}{localPricePerKg.toFixed(2)}/kg
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div className={`tw-w-6 tw-h-6 tw-rounded tw-flex tw-items-center tw-justify-center ${
+                                    isChecked ? "tw-bg-yellow-400" : "tw-bg-gray-700"
+                                  }`}>
                                     {isChecked && (
-                                      <select value={item?.quantity} onChange={(e) => updateQuantity(key, e.target.value)} className="tw-w-full tw-px-3 tw-py-2 tw-bg-black/70 tw-backdrop-blur-md tw-text-yellow-100 tw-border tw-border-yellow-600 tw-rounded-lg tw-text-sm focus:tw-ring-4 focus:tw-ring-yellow-400 tw-mt-auto">
-                                        {quantityOptions.map((q) => {
-                                          const itemPriceINR = pricePerKg * q.kg;
-                                          const localItemPrice = itemPriceINR * localCurrency.rate;
-                                          return (
-                                            <option key={q.value} value={q.value} className="tw-bg-black">
-                                              {q.label} 
-                                              {form.countryCode === "+91" 
-                                                ? ` (₹${itemPriceINR.toFixed(2)})`
-                                                : ` (${localCurrency.symbol}${localItemPrice.toFixed(2)} ${localCurrency.code})`
-                                              }
-                                            </option>
-                                          );
-                                        })}
-                                      </select>
+                                      <svg className="tw-w-4 tw-h-4 tw-text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                      </svg>
                                     )}
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
+                                </div>
+                                
+                                {isChecked && (
+                                  <div className="tw-mt-4">
+                                    <label className="tw-block tw-text-yellow-300 tw-text-sm tw-mb-2">Select Quantity:</label>
+                                    <select 
+                                      value={item?.quantity} 
+                                      onChange={(e) => updateQuantity(key, e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="tw-w-full tw-px-3 tw-py-2 tw-bg-black/70 tw-backdrop-blur-md tw-text-yellow-100 tw-border tw-border-yellow-600 tw-rounded-lg tw-text-sm focus:tw-ring-2 focus:tw-ring-yellow-400"
+                                    >
+                                      {quantityOptions.map((q) => {
+                                        const itemPriceINR = pricePerKg * q.kg;
+                                        const localItemPrice = itemPriceINR * localCurrency.rate;
+                                        return (
+                                          <option key={q.value} value={q.value} className="tw-bg-black">
+                                            {q.label} 
+                                            {form.countryCode === "+91" 
+                                              ? ` (₹${itemPriceINR.toFixed(2)})`
+                                              : ` (${localCurrency.symbol}${localItemPrice.toFixed(2)} ${localCurrency.code})`
+                                            }
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="tw-text-center tw-py-10">
+                          <p className="tw-text-gray-400">No products available in this category.</p>
+                        </div>
+                      )}
+                    </div>
 
-                      {/* Price summary */}
-                      {form.selectedItems.length > 0 && (
-                        <div className="tw-mt-10 tw-p-8 tw-bg-gradient-to-br tw-from-yellow-900/50 tw-to-black/70 tw-backdrop-blur-lg tw-rounded-2xl tw-border-2 tw-border-yellow-500">
-                          <p className="tw-text-2xl tw-font-bold tw-text-yellow-300 tw-mb-5">Selected: {form.selectedItems.length} Sample(s)</p>
-                          <div className="tw-grid tw-grid-cols-1 sm:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
-                            {form.selectedItems.map((item) => {
-                              const localCurrency = convertToLocalCurrency(item.price);
-                              return (
-                                <div key={item.key} className="tw-text-yellow-200 tw-bg-black/60 tw-backdrop-blur tw-px-5 tw-py-3 tw-rounded-xl tw-text-center tw-border tw-border-yellow-600">
-                                  <span className="tw-font-medium">{item.variety}</span> → <strong className="tw-text-yellow-400">{item.grade}</strong><br />
-                                  <span className="tw-text-sm tw-text-yellow-300">{item.quantity}</span><br />
-                                  <span className="tw-text-sm tw-text-green-400">₹{Number(item.price).toFixed(2)}</span>
+                    {/* Selected Items Summary */}
+                    {form.selectedItems.length > 0 && (
+                      <div className="tw-mt-10 tw-p-6 tw-bg-gradient-to-br tw-from-yellow-900/50 tw-to-black/70 tw-backdrop-blur-lg tw-rounded-2xl tw-border-2 tw-border-yellow-500">
+                        <div className="tw-flex tw-items-center tw-justify-between tw-mb-6">
+                          <h6 className="tw-text-2xl tw-font-bold tw-text-yellow-300">
+                            Selected Items ({form.selectedItems.length})
+                          </h6>
+                          <button
+                            onClick={() => {
+                              if (window.confirm("Remove all selected items?")) {
+                                setForm(prev => ({ ...prev, selectedItems: [] }));
+                              }
+                            }}
+                            className="tw-px-4 tw-py-2 tw-bg-red-600/30 tw-text-red-300 hover:tw-bg-red-600/50 tw-rounded-lg tw-transition-colors"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                        
+                        <div className="tw-space-y-4">
+                          {form.selectedItems.map((item) => {
+                            const localCurrency = convertToLocalCurrency(item.price);
+                            return (
+                              <div key={item.key} className="tw-flex tw-items-center tw-justify-between tw-p-4 tw-bg-black/40 tw-rounded-xl tw-border tw-border-yellow-600">
+                                <div>
+                                  <p className="tw-text-yellow-200 tw-font-semibold">
+                                    {item.variety} - {item.grade}
+                                  </p>
+                                  <p className="tw-text-yellow-300 tw-text-sm">
+                                    Quantity: {item.quantity}
+                                  </p>
+                                </div>
+                                <div className="tw-flex tw-items-center tw-gap-4">
+                                  <div className="tw-text-right">
+                                    <p className="tw-text-green-400 tw-font-bold">₹{Number(item.price).toFixed(2)}</p>
+                                    {form.countryCode !== "+91" && (
+                                      <p className="tw-text-blue-300 tw-text-xs">
+                                        ≈ {localCurrency.symbol}{localCurrency.amount.toFixed(2)} {localCurrency.code}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => removeItem(item.key)}
+                                    className="tw-p-2 tw-text-red-400 hover:tw-bg-red-900/30 tw-rounded-lg tw-transition-colors"
+                                  >
+                                    <svg className="tw-w-5 tw-h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Price Summary */}
+                        <div className="tw-mt-8 tw-p-6 tw-bg-black/50 tw-rounded-xl tw-border tw-border-yellow-600">
+                          <h6 className="tw-text-xl tw-font-bold tw-text-yellow-300 tw-mb-4">Price Summary</h6>
+                          <div className="tw-space-y-3">
+                            <div className="tw-flex tw-justify-between">
+                              <span className="tw-text-yellow-100">Rice Total:</span>
+                              <span className="tw-text-yellow-300 tw-font-semibold">
+                                ₹{form.selectedItems.reduce((s, it) => s + Number(it.price || 0), 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="tw-flex tw-justify-between">
+                              <span className="tw-text-yellow-100">Shipping ({shippingMethod}):</span>
+                              <span className="tw-text-yellow-300 tw-font-semibold">
+                                ₹{calculateShippingCharges.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="tw-border-t tw-border-yellow-600 tw-pt-3 tw-mt-3">
+                              <div className="tw-flex tw-justify-between tw-items-center">
+                                <span className="tw-text-lg tw-font-bold tw-text-yellow-300">Total Amount:</span>
+                                <div className="tw-text-right">
+                                  <p className="tw-text-2xl tw-font-bold tw-text-yellow-400">
+                                    ₹{totalAmountINR.toFixed(2)}
+                                  </p>
                                   {form.countryCode !== "+91" && (
-                                    <span className="tw-text-xs tw-text-blue-300 tw-block">
-                                      ≈ {localCurrency.symbol}{localCurrency.amount.toFixed(2)} {localCurrency.code}
-                                    </span>
+                                    <p className="tw-text-blue-300 tw-text-sm">
+                                      ≈ {convertToLocalCurrency(totalAmountINR).symbol}
+                                      {convertToLocalCurrency(totalAmountINR).amount.toFixed(2)} 
+                                      {convertToLocalCurrency(totalAmountINR).code}
+                                    </p>
                                   )}
                                 </div>
-                              );
-                            })}
-                          </div>
-
-                          <div className="tw-mt-6 tw-p-6 tw-bg-black/50 tw-rounded-xl tw-border tw-border-yellow-600">
-                            <h6 className="tw-text-xl tw-font-bold tw-text-yellow-300 tw-mb-4">Price Summary</h6>
-                            <div className="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-                              <div className="tw-text-yellow-100">
-                                <p>Rice Total: 
-                                  <span className="tw-float-right">
-                                    ₹{form.selectedItems.reduce((s, it) => s + Number(it.price || 0), 0).toFixed(2)}
-                                    {form.countryCode !== "+91" && (
-                                      <span className="tw-text-blue-300 tw-text-sm tw-block">
-                                        ≈ {convertToLocalCurrency(form.selectedItems.reduce((s, it) => s + Number(it.price || 0), 0)).symbol}
-                                        {convertToLocalCurrency(form.selectedItems.reduce((s, it) => s + Number(it.price || 0), 0)).amount.toFixed(2)} 
-                                        {convertToLocalCurrency(form.selectedItems.reduce((s, it) => s + Number(it.price || 0), 0)).code}
-                                      </span>
-                                    )}
-                                  </span>
-                                </p>
-                                <p>Shipping ({shippingMethod}): 
-                                  <span className="tw-float-right">
-                                    ₹{calculateShippingCharges.toFixed(2)}
-                                    {form.countryCode !== "+91" && (
-                                      <span className="tw-text-blue-300 tw-text-sm tw-block">
-                                        ≈ {convertToLocalCurrency(calculateShippingCharges).symbol}
-                                        {convertToLocalCurrency(calculateShippingCharges).amount.toFixed(2)} 
-                                        {convertToLocalCurrency(calculateShippingCharges).code}
-                                      </span>
-                                    )}
-                                  </span>
-                                </p>
-                                <hr className="tw-my-2 tw-border-yellow-600" />
-                                <p className="tw-text-lg tw-font-bold tw-text-yellow-300">Total Amount: 
-                                  <span className="tw-float-right">
-                                    ₹{totalAmountINR.toFixed(2)}
-                                    {form.countryCode !== "+91" && (
-                                      <span className="tw-text-blue-300 tw-text-lg tw-block">
-                                        ≈ {convertToLocalCurrency(totalAmountINR).symbol}
-                                        {convertToLocalCurrency(totalAmountINR).amount.toFixed(2)} 
-                                        {convertToLocalCurrency(totalAmountINR).code}
-                                      </span>
-                                    )}
-                                  </span>
-                                </p>
-                                {form.countryCode !== "+91" && (
-                                  <>
-                                    <hr className="tw-my-2 tw-border-yellow-600" />
-                                    <p className="tw-text-sm tw-text-blue-300">
-                                      *Payment will be processed in INR. Your bank will convert to {convertToLocalCurrency(1).name} at their exchange rate.
-                                    </p>
-                                  </>
-                                )}
                               </div>
                             </div>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Payment */}
