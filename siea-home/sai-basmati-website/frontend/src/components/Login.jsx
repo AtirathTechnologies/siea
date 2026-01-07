@@ -305,19 +305,6 @@ export default function Login({ setProfile }) {
             {t("register")}
           </Link>
         </p>
-
-        {/* Admin Login Note */}
-        {/* <div style={{
-          marginTop: '20px',
-          padding: '10px',
-          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '8px',
-          textAlign: 'center'
-        }}>
-          <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-            Admin users will be redirected to admin dashboard automatically.
-          </p>
-        </div> */}
       </div>
     </div>
   );

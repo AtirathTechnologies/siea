@@ -1,13 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import { ref, onValue, set, off } from "firebase/database";
+import { ref as dbRef, onValue, set, off } from "firebase/database";
 import { useLanguage } from "../contexts/LanguageContext";
-// import { db as quoteDb } from "../firebasequote";
 
 export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onLogout }) {
   const { t, setLanguage, currentLang } = useLanguage();
 
-  const [editData, setEditData] = useState({ name: "", email: "", phone: "", avatar: "" });
+  const [editData, setEditData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    avatar: "",
+    street: "",
+    city: "",
+    addressState: "",
+    addressCountry: "",
+    pincode: "",
+    customId: ""
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -35,13 +45,19 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
         name: profile.displayName || profile.email?.split("@")[0] || "Admin",
         email: profile.email || "",
         phone: "",
-        avatar: "",
+        avatar: profile.avatar || "",
+        street: "",
+        city: "",
+        addressState: "",
+        addressCountry: "",
+        pincode: "",
+        customId: ""
       });
       return;
     }
 
     if (profile?.uid && isValidFirebaseUid(profile.uid)) {
-      const usersRef = ref(db, "users");
+      const usersRef = dbRef(db, "users");
       const unsub = onValue(usersRef, (snap) => {
         const data = snap.val() || {};
         let matchedUser = null;
@@ -63,7 +79,6 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
             addressState: matchedUser.addressState || "",
             addressCountry: matchedUser.addressCountry || "",
             pincode: matchedUser.pincode || "",
-            firebaseUid: matchedUser.uid,
             customId: matchedUser.customId,
           });
         }
@@ -75,14 +90,18 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
         name: profile.displayName || "",
         email: profile.email || "",
         phone: "",
-        avatar: ""
+        avatar: profile.avatar || "",
+        street: "",
+        city: "",
+        addressState: "",
+        addressCountry: "",
+        pincode: "",
+        customId: ""
       });
     }
   }, [isOpen, profile, isDefaultAdmin]);
 
-
-
-  // Load orders when popup opens
+  // Load orders
   useEffect(() => {
     if (!showOrdersPopup || !profile?.email) {
       setAllOrders([]);
@@ -93,8 +112,8 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
 
     const userEmail = profile.email.toLowerCase();
 
-    const bulkRef = ref(db, "quotes/bulk");
-    const sampleRef = ref(db, "quotes/sample_courier");
+    const bulkRef = dbRef(db, "quotes/bulk");
+    const sampleRef = dbRef(db, "quotes/sample_courier");
 
     let bulkOrders = [];
     let sampleOrders = [];
@@ -111,10 +130,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
         }))
         .filter((o) => o.email?.toLowerCase() === userEmail);
 
-      setAllOrders([
-        ...bulkOrders,
-        ...sampleOrders
-      ].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      setAllOrders([...bulkOrders, ...sampleOrders].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
       setOrdersLoading(false);
     });
 
@@ -130,10 +146,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
         }))
         .filter((o) => o.email?.toLowerCase() === userEmail);
 
-      setAllOrders([
-        ...bulkOrders,
-        ...sampleOrders
-      ].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      setAllOrders([...bulkOrders, ...sampleOrders].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
       setOrdersLoading(false);
     });
 
@@ -143,6 +156,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     };
   }, [showOrdersPopup, profile?.email]);
 
+  // Prevent background scroll
   useEffect(() => {
     const adminContainer = document.getElementById("admin-scroll-container");
 
@@ -151,7 +165,6 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     };
 
     if (isOpen) {
-      // Lock all scroll sources
       document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
       document.body.style.position = "fixed";
@@ -162,11 +175,9 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
         adminContainer.style.height = "100vh";
       }
 
-      // 🚫 BLOCK TOUCH SCROLL (THIS WAS MISSING)
       document.addEventListener("touchmove", preventScroll, { passive: false });
       document.addEventListener("wheel", preventScroll, { passive: false });
     } else {
-      // Unlock
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
       document.body.style.position = "";
@@ -197,28 +208,76 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     };
   }, [isOpen]);
 
-
   const filteredOrders = allOrders.filter((o) =>
     activeTab === "sample" ? o.type === "sample_courier" : o.type === "quote"
   );
 
-  // Handlers
+  // Input change handler
   const handleChange = (e) => setEditData({ ...editData, [e.target.id]: e.target.value });
+
+  // Base64 Photo Upload (No Storage Needed)
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setMessage({ type: "error", text: "Please select a valid image file." });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage({ type: "error", text: "Image too large. Please choose under 2MB." });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage({ type: "", text: "" });
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setEditData({ ...editData, avatar: event.target.result });
+      setMessage({ type: "success", text: "Photo ready! Click Save to apply." });
+      setIsLoading(false);
+    };
+    reader.onerror = () => {
+      setMessage({ type: "error", text: "Failed to read image." });
+      setIsLoading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setEditData({ ...editData, avatar: "" });
+    setMessage({ type: "success", text: "Photo removed. Save to confirm." });
+  };
+
+  // Save Handler (Updated for Base64)
+  // In ProfilePanel.js, update the handleSave function:
 
   const handleSave = async () => {
     setIsLoading(true);
+    setMessage({ type: "", text: "" });
+
     try {
       if (isDefaultAdmin || !isValidFirebaseUid(profile?.uid)) {
-        const updated = { ...profile, displayName: editData.name || profile.displayName };
-        setProfile(updated);
-        localStorage.setItem("profile", JSON.stringify(updated));
+        const updatedProfile = {
+          ...profile,
+          displayName: editData.name || profile.displayName || profile.email?.split("@")[0],
+          fullName: editData.name || profile.fullName,
+          avatar: editData.avatar || "", // Make sure avatar is included
+        };
+
+        setProfile(updatedProfile); // This should update Navbar
+        localStorage.setItem("profile", JSON.stringify(updatedProfile));
+
+        setMessage({ type: "success", text: "Profile updated successfully!" });
       } else {
-        await set(ref(db, `users/${editData.customId}`), {
+        await set(dbRef(db, `users/${editData.customId}`), {
           uid: profile.uid,
-          fullName: editData.name,
-          email: editData.email || auth.currentUser.email,
-          phone: editData.phone,
-          avatar: editData.avatar,
+          fullName: editData.name || "",
+          email: editData.email || auth.currentUser?.email || "",
+          phone: editData.phone || "",
+          avatar: editData.avatar || "", // Make sure avatar is saved to Firebase
           street: editData.street || "",
           city: editData.city || "",
           addressState: editData.addressState || "",
@@ -226,11 +285,33 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
           pincode: editData.pincode || "",
           createdAt: editData.createdAt || new Date().toISOString(),
         });
+
+        // CRITICAL FIX: Update ALL profile data, not just name and avatar
+        const updatedProfile = {
+          ...profile,
+          fullName: editData.name,
+          avatar: editData.avatar,
+          // Also include all other fields that might be missing
+          email: editData.email || profile.email,
+          phone: editData.phone || profile.phone,
+          street: editData.street || profile.street,
+          city: editData.city || profile.city,
+          addressState: editData.addressState || profile.addressState,
+          addressCountry: editData.addressCountry || profile.addressCountry,
+          pincode: editData.pincode || profile.pincode,
+          customId: editData.customId || profile.customId,
+        };
+
+        setProfile(updatedProfile); // This updates Navbar
+        localStorage.setItem("profile", JSON.stringify(updatedProfile));
+
+        setMessage({ type: "success", text: "Profile updated successfully!" });
       }
-      setMessage({ type: "success", text: "Profile updated successfully!" });
+
       setIsEditing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     } catch (err) {
+      console.error("Save error:", err);
       setMessage({ type: "error", text: "Failed to save changes. Please try again." });
     } finally {
       setIsLoading(false);
@@ -242,71 +323,76 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     setShowOrderDetails(true);
   };
 
+  // In ProfilePanel.js, update the handleLogout function:
+
   const handleLogout = () => {
+    // Clear all local storage
     localStorage.clear();
     sessionStorage.clear();
-    onLogout();
-    onClose();
-    window.location.href = "/";
+
+    // Sign out from Firebase
+    auth.signOut().then(() => {
+      console.log("User signed out successfully");
+
+      // Clear profile state
+      onLogout(); // This calls handleLogout from App.js
+
+      // Close profile panel
+      onClose();
+
+      // Redirect to home
+      window.location.href = "/";
+    }).catch((error) => {
+      console.error("Error signing out:", error);
+      // Still try to clear local state even if Firebase signout fails
+      onLogout();
+      onClose();
+      window.location.href = "/";
+    });
   };
 
   const getDisplayName = () =>
     isDefaultAdmin
       ? profile.displayName || profile.email?.split("@")[0] || t("guest")
-      : editData.name || profile?.displayName || t("guest");
+      : editData.name || profile?.fullName || profile?.displayName || t("guest");
 
   const getDisplayEmail = () =>
     isDefaultAdmin ? profile.email || "" : editData.email || profile?.email || "";
 
-  const getAvatarInitial = () => (editData.avatar ? null : getDisplayName().charAt(0).toUpperCase());
+  const getAvatarInitial = () => {
+    const name = getDisplayName();
+    return (editData.avatar || profile?.avatar) ? null : name.charAt(0).toUpperCase();
+  };
 
   if (!isOpen) return null;
 
-  const allowScrollInside = (e) => {
-    e.stopPropagation();
-  };
-
+  const allowScrollInside = (e) => e.stopPropagation();
 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="tw-fixed tw-inset-0 tw-bg-black/50 tw-backdrop-blur-sm tw-z-40"
-        onClick={onClose}
-      />
+      <div className="tw-fixed tw-inset-0 tw-bg-black/50 tw-backdrop-blur-sm tw-z-40" onClick={onClose} />
 
-      {/* Main Panel - POSITIONED ON LEFT SIDE TO AVOID RSS FEED */}
-      <aside
-        className="
-    tw-fixed tw-z-50 tw-bg-gray-900 tw-text-white tw-shadow-2xl tw-border tw-border-gray-700 tw-flex tw-flex-col
-
-    /* MOBILE (default) */
-    tw-bottom-0 tw-left-0 tw-right-0
-    tw-w-full tw-max-h-[85vh]
-    tw-rounded-t-2xl
-
-    /* TABLET */
-    sm:tw-top-24 sm:tw-bottom-auto sm:tw-left-1/2 sm:-tw-translate-x-1/2
-    sm:tw-w-[90%] sm:tw-max-w-[520px]
-    sm:tw-rounded-2xl
-
-    /* DESKTOP */
-    lg:tw-top-28 lg:tw-right-6 lg:tw-left-auto lg:tw-translate-x-0
-    lg:tw-w-[420px] lg:tw-max-h-[85vh]
-  "
-      >
-
+      {/* Main Panel */}
+      <aside className="
+        tw-fixed tw-z-50 tw-bg-gray-900 tw-text-white tw-shadow-2xl tw-border tw-border-gray-700 tw-flex tw-flex-col
+        tw-bottom-0 tw-left-0 tw-right-0 tw-w-full tw-max-h-[85vh] tw-rounded-t-2xl
+        sm:tw-top-24 sm:tw-bottom-auto sm:tw-left-1/2 sm:-tw-translate-x-1/2 sm:tw-w-[90%] sm:tw-max-w-[520px] sm:tw-rounded-2xl
+        lg:tw-top-28 lg:tw-right-6 lg:tw-left-auto lg:tw-translate-x-0 lg:tw-w-[420px] lg:tw-max-h-[85vh]
+      ">
         {/* Header */}
         <div className="tw-flex tw-items-center tw-p-5 tw-border-b tw-border-gray-700 tw-bg-gray-800/50 tw-sticky tw-top-0">
-          <div className="tw-w-14 tw-h-14 tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-rounded-full tw-flex tw-items-center tw-justify-center tw-text-2xl tw-font-bold tw-shadow-lg">
-            {editData.avatar ? (
+          <div className="tw-w-14 tw-h-14 tw-rounded-full tw-overflow-hidden tw-shadow-lg tw-ring-4 tw-ring-yellow-500">
+            {editData.avatar || profile?.avatar ? (
               <img
-                src={editData.avatar}
+                src={editData.avatar || profile.avatar}
                 alt="Avatar"
-                className="tw-w-full tw-h-full tw-rounded-full tw-object-cover"
+                className="tw-w-full tw-h-full tw-object-cover"
               />
             ) : (
-              getAvatarInitial()
+              <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-2xl tw-font-bold">
+                {getAvatarInitial()}
+              </div>
             )}
           </div>
           <div className="tw-ml-4">
@@ -319,22 +405,16 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
               </div>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="tw-ml-auto tw-text-gray-400 hover:tw-text-white tw-text-xl tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center hover:tw-bg-gray-700 tw-rounded-full"
-          >
+          <button onClick={onClose} className="tw-ml-auto tw-text-gray-400 hover:tw-text-white tw-text-xl tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center hover:tw-bg-gray-700 tw-rounded-full">
             ✕
           </button>
         </div>
 
-        {/* Menu Section */}
+        {/* Scrollable Content */}
         <div className="tw-flex-1 tw-overflow-y-auto tw-scrollbar-thin">
           <div className="tw-p-4">
             {/* My Account */}
-            <button
-              onClick={() => setShowAccountSection(!showAccountSection)}
-              className="tw-flex tw-w-full tw-items-center tw-justify-between tw-p-4 tw-mb-3 tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-rounded-xl tw-transition-all tw-duration-200 tw-border tw-border-gray-700/50"
-            >
+            <button onClick={() => setShowAccountSection(!showAccountSection)} className="tw-flex tw-w-full tw-items-center tw-justify-between tw-p-4 tw-mb-3 tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-rounded-xl tw-transition-all tw-duration-200 tw-border tw-border-gray-700/50">
               <span className="tw-flex tw-items-center tw-text-base">
                 <span className="tw-mr-3 tw-text-xl">👤</span>
                 <span className="tw-font-medium">{t("my_account")}</span>
@@ -347,12 +427,8 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
               onClick={() => {
                 setShowOrdersPopup(true);
                 setActiveTab("sample");
-
-                if (window.innerWidth < 640) {
-                  onClose(); // close profile on mobile
-                }
+                if (window.innerWidth < 640) onClose();
               }}
-
               className="tw-flex tw-w-full tw-items-center tw-justify-between tw-p-4 tw-mb-3 tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-rounded-xl tw-transition-all tw-duration-200 tw-border tw-border-gray-700/50"
             >
               <span className="tw-flex tw-items-center tw-text-base">
@@ -363,10 +439,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
             </button>
 
             {/* Settings */}
-            <button
-              onClick={() => setShowSettingsSection(!showSettingsSection)}
-              className="tw-flex tw-w-full tw-items-center tw-justify-between tw-p-4 tw-mb-3 tw-bg-gradient-to-r tw-from-yellow-900/30 tw-to-yellow-800/20 hover:tw-from-yellow-800/40 hover:tw-to-yellow-700/30 tw-rounded-xl tw-transition-all tw-duration-200 tw-border tw-border-yellow-700/50"
-            >
+            <button onClick={() => setShowSettingsSection(!showSettingsSection)} className="tw-flex tw-w-full tw-items-center tw-justify-between tw-p-4 tw-mb-3 tw-bg-gradient-to-r tw-from-yellow-900/30 tw-to-yellow-800/20 hover:tw-from-yellow-800/40 hover:tw-to-yellow-700/30 tw-rounded-xl tw-transition-all tw-duration-200 tw-border tw-border-yellow-700/50">
               <span className="tw-flex tw-items-center tw-text-base">
                 <span className="tw-mr-3 tw-text-xl">🌐</span>
                 <span className="tw-font-medium tw-text-yellow-100">{t("settings")}</span>
@@ -396,10 +469,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
             )}
 
             {/* Sign Out */}
-            <button
-              onClick={handleLogout}
-              className="tw-flex tw-w-full tw-items-center tw-justify-center tw-p-4 tw-mt-4 tw-bg-gradient-to-r tw-from-red-900/30 tw-to-red-800/20 hover:tw-from-red-800/40 hover:tw-to-red-700/30 tw-rounded-xl tw-transition-all tw-duration-200 tw-border tw-border-red-700/50"
-            >
+            <button onClick={handleLogout} className="tw-flex tw-w-full tw-items-center tw-justify-center tw-p-4 tw-mt-4 tw-bg-gradient-to-r tw-from-red-900/30 tw-to-red-800/20 hover:tw-from-red-800/40 hover:tw-to-red-700/30 tw-rounded-xl tw-transition-all tw-duration-200 tw-border tw-border-red-700/50">
               <span className="tw-flex tw-items-center tw-text-base tw-text-red-300">
                 <span className="tw-mr-3 tw-text-xl">🚪</span>
                 <span className="tw-font-medium">{t("sign_out")}</span>
@@ -422,16 +492,35 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
 
               {isEditing ? (
                 <>
-                  {[
-                    "name",
-                    "email",
-                    "phone",
-                    "street",
-                    "city",
-                    "addressState",
-                    "addressCountry",
-                    "pincode"
-                  ].map((field) => (
+                  {/* Photo Upload */}
+                  <div className="tw-mb-8 tw-flex tw-flex-col tw-items-center">
+                    <div className="tw-relative tw-w-32 tw-h-32 tw-mb-4">
+                      <div className="tw-w-32 tw-h-32 tw-rounded-full tw-overflow-hidden tw-ring-4 tw-ring-yellow-400/50 tw-shadow-xl">
+                        {editData.avatar ? (
+                          <img src={editData.avatar} alt="Profile" className="tw-w-full tw-h-full tw-object-cover" />
+                        ) : (
+                          <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-4xl tw-font-bold">
+                            {editData.name ? editData.name.charAt(0).toUpperCase() : "?"}
+                          </div>
+                        )}
+                      </div>
+                      <label className="tw-absolute tw-bottom-0 tw-right-0 tw-bg-yellow-400 tw-text-black tw-rounded-full tw-p-3 tw-cursor-pointer tw-shadow-lg hover:tw-bg-yellow-300 tw-transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="tw-w-6 tw-h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <input type="file" accept="image/*" onChange={handleImageUpload} className="tw-hidden" disabled={isLoading} />
+                      </label>
+                    </div>
+                    <p className="tw-text-sm tw-text-gray-400 mb-2">Click icon to upload photo (max 2MB)</p>
+                    {editData.avatar && (
+                      <button onClick={handleRemovePhoto} className="tw-text-red-400 hover:tw-text-red-300 tw-text-sm" disabled={isLoading}>
+                        Remove photo
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Form Fields */}
+                  {["name", "email", "phone", "street", "city", "addressState", "addressCountry", "pincode"].map((field) => (
                     <div key={field} className="tw-mb-3">
                       <label className="tw-block tw-text-sm tw-font-medium tw-text-gray-300 tw-mb-1 tw-capitalize">
                         {t(field)}
@@ -439,17 +528,18 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
                       <input
                         id={field}
                         type={field === "email" ? "email" : "text"}
-                        value={editData[field]}
+                        value={editData[field] || ""}
                         onChange={handleChange}
                         className="tw-w-full tw-p-3 tw-mt-1 tw-bg-gray-800 tw-text-white tw-rounded-lg tw-border tw-border-gray-600 focus:tw-outline-none focus:tw-ring-2 focus:tw-ring-blue-500 focus:tw-border-transparent"
                         disabled={field === "email" && isDefaultAdmin}
                       />
                     </div>
                   ))}
+
                   <button
                     onClick={handleSave}
                     disabled={isLoading}
-                    className="tw-w-full tw-py-3 tw-mt-4 tw-bg-gradient-to-r tw-from-blue-600 tw-to-blue-700 hover:tw-from-blue-700 hover:tw-to-blue-800 tw-rounded-lg tw-font-medium tw-transition-all tw-duration-200"
+                    className="tw-w-full tw-py-3 tw-mt-6 tw-bg-gradient-to-r tw-from-blue-600 tw-to-blue-700 hover:tw-from-blue-700 hover:tw-to-blue-800 tw-rounded-lg tw-font-medium tw-transition-all tw-duration-200"
                   >
                     {isLoading ? "Saving..." : t("save_changes")}
                   </button>
@@ -696,7 +786,6 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
 
                 {/* Order Details Grid */}
                 <div className="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-6 tw-mb-6">
-                  {/* Customer Details - Only for Sample Courier */}
                   {selectedOrder.type === "sample_courier" && (
                     <div className="tw-bg-gray-800 tw-p-4 tw-rounded-lg">
                       <h3 className="tw-text-lg tw-font-bold tw-text-yellow-400 tw-mb-3">Customer Details</h3>
@@ -712,7 +801,6 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
                     </div>
                   )}
 
-                  {/* Order Information */}
                   <div className={`tw-bg-gray-800 tw-p-4 tw-rounded-lg ${selectedOrder.type === "sample_courier" ? "" : "md:tw-col-span-2"}`}>
                     <h3 className="tw-text-lg tw-font-bold tw-text-yellow-400 tw-mb-3">Order Information</h3>
                     <div className="tw-space-y-2">
@@ -798,7 +886,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
                   )}
                 </div>
 
-                {/* Notes/Additional Info */}
+                {/* Additional Info */}
                 {(selectedOrder.notes || selectedOrder.additionalInfo) && (
                   <div className="tw-mt-6 tw-bg-gray-800 tw-p-4 tw-rounded-lg">
                     <h3 className="tw-text-lg tw-font-bold tw-text-yellow-400 tw-mb-3">Additional Information</h3>

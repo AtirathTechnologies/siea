@@ -1,22 +1,59 @@
-import React, { useState, useEffect } from "react";
+// src/components/Navbar.jsx
+import React, { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import logoUrl from "../assets/logo.png";
 import { useLanguage } from "../contexts/LanguageContext";
+import { otherServices } from "../data/services";
 
 export default function Navbar({ profile, handleLogout, onProfileClick = () => { } }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isServicesOpen, setIsServicesOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const servicesTimeoutRef = useRef(null);
+
+  // Get service options from your data
+  const serviceOptions = Object.keys(otherServices);
 
   useEffect(() => {
     setMenuOpen(false);
+    setIsServicesOpen(false);
+    return () => {
+      if (servicesTimeoutRef.current) {
+        clearTimeout(servicesTimeoutRef.current);
+      }
+    };
   }, [location]);
 
   const closeMenu = () => setMenuOpen(false);
 
+  const handleMouseEnterServices = () => {
+    if (servicesTimeoutRef.current) {
+      clearTimeout(servicesTimeoutRef.current);
+    }
+    setIsServicesOpen(true);
+  };
+
+  const handleMouseLeaveServices = () => {
+    servicesTimeoutRef.current = setTimeout(() => {
+      setIsServicesOpen(false);
+    }, 200);
+  };
+
+  const handleServiceSelect = (service) => {
+    closeMenu();
+    setIsServicesOpen(false);
+    
+    // Navigate to service page with selected service
+    navigate(`/service?service=${encodeURIComponent(service)}`, {
+      state: { selectedService: service }
+    });
+  };
+
   const handleSectionNavigation = (sectionId, isFooter = false) => {
     closeMenu();
+    setIsServicesOpen(false);
     if (location.pathname === "/") {
       setTimeout(() => {
         const element = document.getElementById(sectionId);
@@ -30,19 +67,26 @@ export default function Navbar({ profile, handleLogout, onProfileClick = () => {
     }
   };
 
-  const openSampleCourierForm = () => {
-    closeMenu();
-    navigate("/service");
-    setTimeout(() => {
-      const dropdown = document.querySelector('.service-dropdown-container .region-button');
-      if (dropdown) dropdown.click();
+  // Get proper display name
+  const getDisplayName = () => {
+    if (!profile) return "";
 
-      setTimeout(() => {
-        const option = Array.from(document.querySelectorAll('.dropdown-item'))
-          .find(el => el.textContent.includes("Sample Courier Services"));
-        if (option) option.click();
-      }, 300);
-    }, 500);
+    if (profile.isDefaultAdmin) {
+      return profile.displayName || profile.email?.split("@")[0] || "Admin";
+    }
+
+    return (
+      profile.fullName ||
+      profile.displayName ||
+      profile.email?.split("@")[0] ||
+      "User"
+    );
+  };
+
+  // Get avatar initial letter
+  const getAvatarInitial = () => {
+    const name = getDisplayName();
+    return name ? name.charAt(0).toUpperCase() : "?";
   };
 
   return (
@@ -76,7 +120,7 @@ export default function Navbar({ profile, handleLogout, onProfileClick = () => {
         </button>
 
         <div
-          className={`${menuOpen ? "tw-flex" : "tw-hidden"
+          className={`${menuOpen ? "tw-flex" : "tw-hidden"}
             } tw-flex-col lg:tw-flex lg:tw-flex-row tw-w-full lg:tw-w-auto 
           tw-bg-black/50 tw-backdrop-blur-md tw-rounded-xl
           tw-pt-4 lg:tw-pt-0 tw-gap-6 lg:tw-gap-8 
@@ -109,19 +153,56 @@ export default function Navbar({ profile, handleLogout, onProfileClick = () => {
               </NavLink>
             </li>
 
-            <li>
-              <NavLink to="/service" className="tw-block tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150" onClick={closeMenu}>
+            {/* Services Dropdown - Hover Based */}
+            <li 
+              className="tw-relative"
+              onMouseEnter={handleMouseEnterServices}
+              onMouseLeave={handleMouseLeaveServices}
+            >
+              <NavLink
+                to="/service"
+                className={({ isActive }) => `tw-flex tw-items-center tw-gap-1 tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150 tw-font-medium ${isActive ? "tw-text-white" : ""}`}
+              >
                 {t("services")}
+                <div className={`tw-transition-transform tw-duration-200 ${isServicesOpen ? "tw-rotate-180" : ""}`}>
+                  <svg className="tw-w-4 tw-h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </NavLink>
+              
+              {/* Simple Dropdown Menu - No boxes, just simple list */}
+              {isServicesOpen && (
+                <div 
+                  className="tw-absolute tw-left-0 tw-top-full tw-mt-2 tw-min-w-48 tw-bg-gray-900 tw-rounded-lg tw-shadow-xl tw-z-50"
+                  onMouseEnter={() => {
+                    if (servicesTimeoutRef.current) {
+                      clearTimeout(servicesTimeoutRef.current);
+                    }
+                    setIsServicesOpen(true);
+                  }}
+                  onMouseLeave={handleMouseLeaveServices}
+                >
+                  <div className="tw-py-2">
+                    {serviceOptions.map((serviceOpt, idx) => (
+                      <button
+                        key={`${serviceOpt}-${idx}`}
+                        onClick={() => handleServiceSelect(serviceOpt)}
+                        className="tw-block tw-w-full tw-text-left tw-px-4 tw-py-3 tw-text-yellow-400 hover:tw-bg-gray-800 tw-transition tw-duration-150 tw-border-t tw-border-gray-700 first:tw-border-t-0"
+                      >
+                        {serviceOpt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </li>
 
+            {/* Sample Courier Service as separate link */}
             <li>
-              <button
-                onClick={openSampleCourierForm}
-                className="tw-block tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150 tw-font-medium"
-              >
-                {t("sample_courier_service")}
-              </button>
+              <NavLink to="/sample-courier" className="tw-block tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150" onClick={closeMenu}>
+                {t("request_rice_samples")}
+              </NavLink>
             </li>
 
             <li>
@@ -149,9 +230,31 @@ export default function Navbar({ profile, handleLogout, onProfileClick = () => {
                     closeMenu();
                     onProfileClick();
                   }}
-                  className="tw-block tw-w-full lg:tw-w-auto tw-bg-yellow-400 tw-text-black tw-px-6 tw-py-2 tw-rounded tw-font-medium hover:tw-bg-yellow-300 tw-transition tw-duration-150"
+                  className="tw-flex tw-items-center tw-gap-3 tw-px-4 tw-py-2 tw-rounded-lg tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-transition tw-duration-200 tw-font-medium tw-text-white"
                 >
-                  {t("profile_button")}
+                  <div className="tw-w-6 tw-h-6 tw-rounded-full tw-overflow-hidden tw-shadow-md tw-ring-2 tw-ring-yellow-500">
+                    {profile.avatar ? (
+                      <img
+                        src={profile.avatar}
+                        alt="Profile"
+                        className="tw-w-full tw-h-full tw-object-cover"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.parentNode.style.background = "linear-gradient(to bottom right, #22c55e, #3b82f6)";
+                          e.target.parentNode.innerHTML += `<span class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full tw-text-white tw-font-bold tw-text-sm">${getAvatarInitial()}</span>`;
+                        }}
+                      />
+                    ) : (
+                      <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-sm tw-font-bold">
+                        {getAvatarInitial()}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Dropdown Arrow */}
+                  <svg className="tw-w-4 tw-h-4 tw-text-yellow-400 tw-hidden sm:tw-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
               </li>
             ) : (

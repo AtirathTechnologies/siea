@@ -34,9 +34,9 @@ import TodaysOrders from "./admin/pages/TodaysOrders";
 import AdminMarketPrices from "./admin/AdminMarketPrices";
 import History from "./admin/pages/History";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "./firebase";
-
-
+import { auth, db } from "./firebase";
+import { ref, onValue, off } from "firebase/database";
+import SampleCourierService from "./components/SampleCourierService";
 
 function ScrollToHash() {
   const location = useLocation();
@@ -58,38 +58,31 @@ function ScrollToHash() {
   return null;
 }
 
+// Helper function to check if UID is valid for Firebase
+const isValidFirebaseUid = (uid) => uid && !/[@.#$\[\]]/.test(uid);
+
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-
-
   const [profile, setProfile] = useState(() => {
     try {
-      const s = localStorage.getItem("profile");
-      return s ? JSON.parse(s) : null;
-    } catch {
+      const savedProfile = localStorage.getItem("profile");
+      if (savedProfile) {
+        const parsed = JSON.parse(savedProfile);
+        console.log("Loaded profile from localStorage:", {
+          hasAvatar: !!parsed?.avatar,
+          avatarLength: parsed?.avatar?.length,
+          name: parsed?.fullName || parsed?.displayName
+        });
+        return parsed;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error parsing saved profile:", error);
       return null;
     }
   });
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        // 🔐 Not logged in → remove fake admin/profile
-        setProfile(null);
-        localStorage.removeItem("profile");
-        localStorage.removeItem("isAdmin");
-      } else if (profile && profile.email !== user.email) {
-        // 🔐 Logged in but mismatch → clear
-        setProfile(null);
-        localStorage.removeItem("profile");
-      }
-    });
-
-    return () => unsub();
-  }, []);
-
 
   const [showWarningPopup, setShowWarningPopup] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -97,18 +90,202 @@ export default function App() {
 
   const isAdminDashboard = location.pathname.startsWith("/admin");
 
+  // Sync profile with Firebase Realtime Database when auth state changes
   useEffect(() => {
+    console.log("Profile state updated:", {
+      hasProfile: !!profile,
+      hasAvatar: !!profile?.avatar,
+      avatarPreview: profile?.avatar?.substring(0, 30) + "..."
+    });
+
     try {
-      if (profile) localStorage.setItem("profile", JSON.stringify(profile));
-      else localStorage.removeItem("profile");
-    } catch { }
+      if (profile) {
+        localStorage.setItem("profile", JSON.stringify(profile));
+      } else {
+        localStorage.removeItem("profile");
+      }
+    } catch (error) {
+      console.error("Error saving profile to localStorage:", error);
+    }
   }, [profile]);
 
-  const handleLogout = () => {
+
+  useEffect(() => {
+    let isMounted = true;
+    let dbListenerUnsubscribe = null;
+
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!isMounted) return;
+
+      if (!user) {
+        console.log("No user logged in, clearing profile");
+        setProfile(null);
+        localStorage.removeItem("profile");
+        localStorage.removeItem("isAdmin");
+      } else {
+        console.log("User authenticated:", user.email);
+
+        if (isValidFirebaseUid(user.uid)) {
+          const usersRef = ref(db, "users");
+
+          if (dbListenerUnsubscribe) {
+            dbListenerUnsubscribe();
+          }
+
+          dbListenerUnsubscribe = onValue(usersRef, (snapshot) => {
+            if (!isMounted) return;
+
+            const users = snapshot.val() || {};
+            let userData = null;
+
+            Object.keys(users).forEach((key) => {
+              if (users[key].uid === user.uid) {
+                userData = {
+                  uid: user.uid,
+                  email: user.email,
+                  displayName: user.displayName || user.email?.split("@")[0],
+                  photoURL: user.photoURL,
+                  ...users[key],
+                  customId: key
+                };
+              }
+            });
+
+            if (userData) {
+              console.log("Found user in database:", {
+                name: userData.fullName,
+                hasAvatar: !!userData.avatar,
+                avatarLength: userData.avatar?.length
+              });
+
+              setProfile(userData);
+              localStorage.setItem("profile", JSON.stringify(userData));
+            } else if (user.email === "admin@gmail.com") {
+              console.log("Setting default admin profile");
+              const defaultProfile = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || user.email?.split("@")[0],
+                photoURL: user.photoURL || "",
+                isDefaultAdmin: true
+              };
+              setProfile(defaultProfile);
+              localStorage.setItem("profile", JSON.stringify(defaultProfile));
+            } else {
+              // User authenticated but not in database yet (new registration)
+              console.log("User not found in database, creating minimal profile");
+              const minimalProfile = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || user.email?.split("@")[0],
+                photoURL: user.photoURL || "",
+                fullName: user.displayName || ""
+              };
+              setProfile(minimalProfile);
+              localStorage.setItem("profile", JSON.stringify(minimalProfile));
+            }
+          });
+        } else {
+          // Invalid UID format, use auth data only
+          console.log("Invalid UID format, using auth data only");
+          const authProfile = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || user.email?.split("@")[0],
+            photoURL: user.photoURL || "",
+            isDefaultAdmin: user.email === "admin@gmail.com"
+          };
+          setProfile(authProfile);
+          localStorage.setItem("profile", JSON.stringify(authProfile));
+        }
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      unsub();
+      if (dbListenerUnsubscribe) {
+        dbListenerUnsubscribe();
+      }
+    };
+  }, []);
+
+  // Also load profile from localStorage on mount (for quick initial display)
+  useEffect(() => {
+    const savedProfile = localStorage.getItem("profile");
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile);
+        console.log("Initial localStorage profile load:", {
+          name: parsed.fullName || parsed.displayName,
+          hasAvatar: !!parsed.avatar
+        });
+
+        // If we have a valid UID but no avatar, try to load from Firebase
+        if (parsed.uid && isValidFirebaseUid(parsed.uid) && !parsed.avatar) {
+          const usersRef = ref(db, "users");
+          const quickCheck = onValue(usersRef, (snapshot) => {
+            const users = snapshot.val() || {};
+            Object.keys(users).forEach((key) => {
+              if (users[key].uid === parsed.uid && users[key].avatar) {
+                console.log("Found avatar in Firebase for cached user");
+                const updatedProfile = {
+                  ...parsed,
+                  avatar: users[key].avatar,
+                  customId: key
+                };
+                setProfile(updatedProfile);
+                localStorage.setItem("profile", JSON.stringify(updatedProfile));
+              }
+            });
+            off(usersRef, "value", quickCheck);
+          });
+        }
+      } catch (error) {
+        console.error("Error in initial profile load:", error);
+      }
+    }
+  }, []);
+
+  // In App.js, update the handleLogout function:
+
+  const handleLogout = async () => {
+    console.log("Logging out...");
+
+    try {
+      // Sign out from Firebase first
+      await auth.signOut();
+      console.log("Firebase sign out successful");
+    } catch (error) {
+      console.error("Firebase sign out error:", error);
+    }
+
+    // Clear all state and storage
     setProfile(null);
-    localStorage.removeItem("profile");
-    localStorage.removeItem("isAdmin");
+
+    // Clear ALL localStorage items to prevent any caching
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.includes('profile') || key.includes('auth') || key.includes('user') || key.includes('firebase') || key.includes('admin')) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+      console.log("Removed from localStorage:", key);
+    });
+
+    // Force immediate state update
+    setProfile(null);
     navigate("/");
+
+    // Force full page reload after a short delay
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const openProfilePanel = () => {
@@ -127,7 +304,6 @@ export default function App() {
   const searchProducts = (value) => {
     setSearchQuery(value);
   };
-
 
   const goHome = () => navigate("/");
   const isProductsPage =
@@ -228,6 +404,7 @@ export default function App() {
               <Route path="/login" element={<Login setProfile={setProfile} />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/service" element={<Service />} />
+              <Route path="/sample-courier" element={<SampleCourierService />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/transport" element={<Transport />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />

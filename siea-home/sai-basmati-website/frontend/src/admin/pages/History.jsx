@@ -654,7 +654,7 @@ export default function History() {
                 <div className="tw-flex tw-justify-between tw-items-start tw-mb-6">
                   <div>
                     <h2 className="tw-text-yellow-400 tw-text-2xl tw-mb-1">
-                      History Details - Side by Side Comparison
+                      History Details
                     </h2>
                     <div className="tw-text-gray-300 tw-space-y-1">
                       <p><span className="tw-text-yellow-300">Time:</span> {new Date(selected.timestamp).toLocaleString()}</p>

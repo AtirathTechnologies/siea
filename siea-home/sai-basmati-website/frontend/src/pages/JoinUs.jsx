@@ -60,6 +60,19 @@ const JoinUs = () => {
     }));
   };
 
+  const handlePhoneChange = (e) => {
+    const { name, value } = e.target;
+
+    // Allow only digits
+    const numericValue = value.replace(/\D/g, "");
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: numericValue
+    }));
+  };
+
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -213,7 +226,10 @@ ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
                   name="vendorPhone"
                   placeholder="Phone Number *"
                   value={formData.vendorPhone}
-                  onChange={handleInputChange}
+                  onChange={handlePhoneChange}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={15}
                   className="tw-w-full tw-px-4 tw-py-3 tw-rounded-xl tw-bg-black/60 tw-text-yellow-100 placeholder:tw-text-yellow-500 tw-border-2 tw-border-yellow-600 focus:tw-ring-4 focus:tw-ring-yellow-400"
                   required
                 />
@@ -326,7 +342,10 @@ ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
                   name="distributorPhone"
                   placeholder="Phone Number *"
                   value={formData.distributorPhone}
-                  onChange={handleInputChange}
+                  onChange={handlePhoneChange}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={15}
                   className="tw-w-full tw-px-4 tw-py-3 tw-rounded-xl tw-bg-black/60 tw-text-yellow-100 placeholder:tw-text-yellow-500 tw-border-2 tw-border-yellow-600 focus:tw-ring-4 focus:tw-ring-yellow-400"
                   required
                 />
@@ -450,7 +469,10 @@ ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
                   name="partnerPhone"
                   placeholder="Phone Number *"
                   value={formData.partnerPhone}
-                  onChange={handleInputChange}
+                  onChange={handlePhoneChange}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={15}
                   className="tw-w-full tw-px-4 tw-py-3 tw-rounded-xl tw-bg-black/60 tw-text-yellow-100 placeholder:tw-text-yellow-500 tw-border-2 tw-border-yellow-600 focus:tw-ring-4 focus:tw-ring-yellow-400"
                   required
                 />
@@ -559,7 +581,10 @@ ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
                   name="agentPhone"
                   placeholder="Phone Number *"
                   value={formData.agentPhone}
-                  onChange={handleInputChange}
+                  onChange={handlePhoneChange}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={15}
                   className="tw-w-full tw-px-4 tw-py-3 tw-rounded-xl tw-bg-black/60 tw-text-yellow-100 placeholder:tw-text-yellow-500 tw-border-2 tw-border-yellow-600 focus:tw-ring-4 focus:tw-ring-yellow-400"
                   required
                 />

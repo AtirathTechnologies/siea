@@ -61,7 +61,19 @@ const ProductDetailsPanel = ({
                         alt={name}
                         className="tw-w-full tw-h-[260px] tw-object-cover tw-rounded-lg"
                     />
+
+                    {/* Enquire Now Button BELOW IMAGE */}
+                    <div className="tw-mt-5 tw-flex tw-justify-center">
+                        <button
+                            onClick={onEnquire}
+                            className="tw-bg-yellow-400 tw-text-black tw-font-bold tw-px-8 tw-py-3 tw-rounded-xl tw-text-base hover:tw-scale-105 tw-transition"
+                        >
+                            Enquire Now
+                        </button>
+                    </div>
                 </div>
+
+
 
                 {/* DETAILS */}
                 <div>
@@ -109,6 +121,15 @@ const ProductDetailsPanel = ({
                 </div>
             </div>
 
+            {/* <div className="tw-mt-8 tw-flex tw-justify-center">
+                <button
+                    onClick={onEnquire}
+                    className="tw-bg-yellow-400 tw-text-black tw-font-bold tw-px-10 tw-py-3 tw-rounded-xl tw-text-lg hover:tw-scale-105 tw-transition"
+                >
+                    Enquire Now
+                </button>
+            </div> */}
+
             {/* RELATED PRODUCTS */}
             {relatedProducts?.length > 0 && (
                 <div className="tw-mt-12 tw-bg-black/50 tw-rounded-xl tw-p-5 tw-border tw-border-yellow-400/20">
@@ -142,15 +163,8 @@ const ProductDetailsPanel = ({
                 </div>
             )}
 
-            {/* CTA */}
-            <div className="tw-mt-8 tw-flex tw-justify-center">
-                <button
-                    onClick={onEnquire}
-                    className="tw-bg-yellow-400 tw-text-black tw-font-bold tw-px-10 tw-py-3 tw-rounded-xl tw-text-lg hover:tw-scale-105 tw-transition"
-                >
-                    Enquire Now
-                </button>
-            </div>
+
+
         </div>
     );
 };

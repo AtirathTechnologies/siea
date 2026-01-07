@@ -233,3 +233,44 @@ body {
     margin-bottom: 0; /* Remove extra margin for last card in desktop */
   }
 }
+
+.cart-panel {
+  position: fixed;
+  top: 0;
+  right: -360px;
+  width: 360px;
+  height: 100vh;
+  background: #111;
+  color: #fff;
+  padding: 16px;
+  transition: right 0.3s ease;
+  z-index: 999;
+}
+
+.cart-panel.open {
+  right: 0;
+}
+
+.cart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cart-item {
+  border-bottom: 1px solid #333;
+  padding: 10px 0;
+}
+
+.qty-controls button {
+  margin: 0 6px;
+}
+
+.proceed-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  background: gold;
+  color: black;
+  font-weight: bold;
+}

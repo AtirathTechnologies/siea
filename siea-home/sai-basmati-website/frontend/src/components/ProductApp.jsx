@@ -8,10 +8,15 @@ import BuyModal from '../pages/BuyModal';
 import ThankYouPopup from '../components/ThankYouPopup';
 import BasmatiRSSFeed from "../components/BasmatiRSSFeed";
 import ProductDetailsPanel from '../pages/ProductDetailsPanel';
+import { useLocation, useNavigate } from "react-router-dom";
 import '../Prod.css';
 
 const AppContent = ({ profile, showWarning, searchQuery }) => {
   const { t } = useLanguage();
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
 
   // Currency State
   const [currency, setCurrency] = useState("INR");
@@ -79,6 +84,26 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (
+      location.state?.openDetails &&
+      location.state?.productId &&
+      allProducts.length > 0
+    ) {
+      const product = allProducts.find(
+        (p) =>
+          p.firebaseId === location.state.productId ||
+          p.id === location.state.productId
+      );
+
+      if (product) {
+        setDetailsProduct(product);
+        setShowRssFeed(false);
+      }
+    }
+  }, [location.state, allProducts]);
+
 
   // Filtering
   useEffect(() => {
@@ -198,9 +223,14 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
               product={detailsProduct}
               allProducts={allProducts}
               onBack={() => {
-                setDetailsProduct(null);
-                setShowRssFeed(true);
+                if (location.state?.from === "/products") {
+                  navigate(-1);
+                } else {
+                  setDetailsProduct(null);
+                  setShowRssFeed(true);
+                }
               }}
+
               onEnquire={() => {
                 if (!profile) {
                   showWarning();

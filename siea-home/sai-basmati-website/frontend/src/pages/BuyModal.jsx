@@ -35,9 +35,7 @@ const BuyModal = ({ isOpen, onClose, product, profile }) => {
   const [addressCountry, setAddressCountry] = useState("");
   const [pincode, setPincode] = useState("");
 
-
-  // NEW: Firebase live grades & price
-  const [grades, setGrades] = useState([]); // replaces static riceData filtering
+  const [grades, setGrades] = useState([]);
   const [liveGradePricePerKg, setLiveGradePricePerKg] = useState(0); // live price per kg
 
   const [fullName, setFullName] = useState("");
@@ -113,8 +111,6 @@ const BuyModal = ({ isOpen, onClose, product, profile }) => {
     Kolkata: 6599,
   };
 
-  // CORRECTED: Fetch grades from /products/{productId}/grades
-  // CORRECTED: Fetch grades from /products/{firebaseId}/grades
   useEffect(() => {
     if (!product?.firebaseId) return;
 
@@ -341,7 +337,7 @@ const BuyModal = ({ isOpen, onClose, product, profile }) => {
 
   return (
     <div className="buy-modal-overlay">
-      <div className="buy-modal-container" style={{ maxWidth: '1100px' }}>
+      <div className="buy-modal-container">
         <canvas ref={canvasRef} className="buy-modal-canvas" />
         <button className="buy-modal-close-btn" onClick={handleClose} aria-label={t("close_modal")}>×</button>
         <div className="buy-modal-header"><h2 className="buy-modal-title">{t("get_quote")}</h2></div>
@@ -356,7 +352,7 @@ const BuyModal = ({ isOpen, onClose, product, profile }) => {
                   <label>{t("email_address")} * <input type="email" value={email} onChange={handleEmailChange} required className="input-field" readOnly={!!profile} /> {emailError && <div className="error-text">{emailError}</div>}</label>
                   <label>{t("phone_number")} *
                     <div className="phone-input-group">
-                      <select value={countryCode} onChange={handleCountryChange} className="country-code-select" disabled={!!profile}>
+                      <select value={countryCode} onChange={handleCountryChange} className="country-code-select no-arrow" disabled={!!profile}>
                         {countryOptions.map(o => <option key={o.value} value={o.value}>{o.flag} {o.value}</option>)}
                       </select>
                       <input type="tel" value={phoneNumber} onChange={handlePhoneChange} maxLength={getCurrentCountry()?.length || 10} required className="input-field flex-grow" readOnly={!!profile} />
@@ -402,7 +398,7 @@ const BuyModal = ({ isOpen, onClose, product, profile }) => {
                 {/* Product */}
                 <section className="form-section">
                   <h3>{t("product_information")}</h3>
-                  <label>{t("category")} <select disabled value={product?.category} className="select-field"><option>{product?.category}</option></select></label>
+                  <label>{t("category")} <select disabled value={product?.category} className="select-field no-arrow"><option>{product?.category}</option></select></label>
 
                   {/* GRADE FROM FIREBASE */}
                   <label>{t("grade")} *
@@ -521,6 +517,12 @@ const BuyModal = ({ isOpen, onClose, product, profile }) => {
                   <span>{t("total_price")}:</span>
                   <span>{currencyOptions.find(o => o.value === currency)?.symbol}{totalPrice.toFixed(2)} ({cif === "Yes" ? t("cif_term") : t("fob_term")})</span>
                 </div>
+              </div>
+              {/* NOTE BELOW ESTIMATED BILL */}
+              <div className="tw-mt-4 tw-text-xs tw-text-yellow-400 tw-leading-relaxed">
+                {t("note")}:{" "}
+                {t(
+                  "This is an estimated cost. Actual costs may vary based on additional requirements and market conditions.")}
               </div>
             </div>
           </div>

@@ -1,7 +1,5 @@
-// src/pages/Products.jsx
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../contexts/LanguageContext";
-// import { getGradeSpecificPriceRange } from "../data/products";
 import { useState, useEffect } from "react";
 
 import { db } from "../firebase";
@@ -9,11 +7,11 @@ import { ref, onValue } from "firebase/database";
 
 export default function Products() {
   const navigate = useNavigate();
-  const { t,currentLang} = useLanguage();
+  const { t, currentLang } = useLanguage();
 
   const [currency, setCurrency] = useState("INR");
   const [showDropdown, setShowDropdown] = useState(false);
-  const [featuredProducts, setFeaturedProducts] = useState([]); // ← New: top 4 from Firebase
+  const [featuredProducts, setFeaturedProducts] = useState([]);
 
   const goToProd = () => navigate("/Products-All");
 
@@ -26,56 +24,41 @@ export default function Products() {
 
   const currentCurrency = currencies.find((c) => c.code === currency);
 
-  // Fetch products from Firebase and pick top 4 featured ones
+  // 🔹 Fetch top 4 products
   useEffect(() => {
     const r = ref(db, "products");
-    const unsubscribe = onValue(r, (snap) => {
+    const unsub = onValue(r, (snap) => {
       if (snap.exists()) {
         const data = snap.val();
-        const list = Object.values(data);
-
-        // Optional: sort by some field like 'featured: true' or 'id' or 'name'
-        // Here we just take first 4 (or you can filter featured ones later)
-        const topFour = list.slice(0, 4);
-
-        setFeaturedProducts(topFour);
+        const list = Object.keys(data).map((key) => ({
+          ...data[key],
+          firebaseId: key,
+        }));
+        setFeaturedProducts(list.slice(0, 4));
       } else {
         setFeaturedProducts([]);
       }
     });
-
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
-  // Reuse your existing parse + format logic
   const parseMinMaxFromString = (priceStr) => {
     if (!priceStr || typeof priceStr !== "string") return null;
-    const matches = priceStr.match(/[\d,]+/g);
-    if (!matches || matches.length < 2) return null;
-    const nums = matches.slice(0, 2).map((s) => Number(s.replace(/,/g, "")));
-    if (nums.some(isNaN)) return null;
-    return nums;
+    const m = priceStr.match(/[\d,]+/g);
+    if (!m || m.length < 2) return null;
+    return m.slice(0, 2).map((s) => Number(s.replace(/,/g, "")));
   };
 
   const formatPrice = (product) => {
-    if (!product?.price) {
-      const fallback = getGradeSpecificPriceRange(product?.name?.en || "", currency);
-      return fallback || "N/A";
-    }
-
     const parsed = parseMinMaxFromString(product.price);
-    if (parsed) {
-      const [minINR, maxINR] = parsed;
-      const rate = currentCurrency.rate || 1;
-      const minC = Math.round(minINR * rate);
-      const maxC = Math.round(maxINR * rate);
-      return `${currentCurrency.symbol}${minC} – ${currentCurrency.symbol}${maxC} / qtl`;
-    }
-
-    return "N/A";
+    if (!parsed) return "N/A";
+    const [min, max] = parsed;
+    const rate = currentCurrency.rate || 1;
+    return `${currentCurrency.symbol}${Math.round(
+      min * rate
+    )} – ${currentCurrency.symbol}${Math.round(max * rate)} / qtl`;
   };
 
-  // Fallback images map (in case image URL missing)
   const fallbackImages = {
     "1121 Basmati": "./img/1121_Golden_Basamati.jpg",
     "1401 Basmati": "./img/1401_Steam_Basamati.jpg",
@@ -83,35 +66,34 @@ export default function Products() {
     "1885 Basmati": "./img/1885_Basmati.jpg",
   };
 
-  const getProductImage = (product) => {
-    return product.image || fallbackImages[product.name?.en] || "./img/default_rice.jpg";
-  };
+  const getProductImage = (product) =>
+    product.image ||
+    fallbackImages[product.name?.en] ||
+    "./img/default_rice.jpg";
 
-  const getProductTitle = (product) => {
-    return product.name[currentLang] || product.name.en || "Premium Basmati Rice";
-  };
+  const getProductTitle = (product) =>
+    product.name?.[currentLang] ||
+    product.name?.en ||
+    "Premium Basmati Rice";
 
-  const getProductDesc = (product) => {
-  return (
+  const getProductDesc = (product) =>
     product.desc?.[currentLang] ||
     product.desc?.en ||
-    t("premium_basmati_1121_desc")
-  );
-};
-
+    t("premium_basmati_1121_desc");
 
   return (
     <div className="tw-min-h-screen tw-w-full tw-py-8 sm:tw-py-12 tw-px-4 sm:tw-px-8 tw-flex tw-flex-col">
-      {/* Centered Title + Currency Button */}
+      {/* Title + Currency */}
       <div className="tw-relative tw-flex tw-justify-center tw-items-center tw-mb-8">
         <h1 className="tw-text-3xl sm:tw-text-4xl tw-font-extrabold tw-text-yellow-400">
           {t("products_title")}
         </h1>
 
+        {/* ✅ CURRENCY BUTTON (RESTORED) */}
         <div className="tw-absolute tw-right-0 tw-mt-10 sm:tw-mt-0">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="tw-bg-black/50 tw-backdrop-blur-md tw-border tw-border-yellow-400/40 tw-text-yellow-300 tw-px-4 tw-py-2 tw-rounded-lg tw-text-sm sm:tw-text-base tw-font-semibold tw-transition-all tw-duration-300 hover:tw-bg-yellow-400 hover:tw-text-black hover:tw-shadow-md hover:tw-scale-105"
+            className="tw-bg-black/50 tw-backdrop-blur-md tw-border tw-border-yellow-400/40 tw-text-yellow-300 tw-px-4 tw-py-2 tw-rounded-lg tw-font-semibold hover:tw-bg-yellow-400 hover:tw-text-black"
           >
             {currentCurrency.symbol} {currentCurrency.code}
           </button>
@@ -125,7 +107,7 @@ export default function Products() {
                     setCurrency(curr.code);
                     setShowDropdown(false);
                   }}
-                  className="tw-w-full tw-text-left tw-px-4 tw-py-2 tw-text-sm tw-text-yellow-200 hover:tw-bg-yellow-400/20 hover:tw-text-yellow-100 tw-transition-colors"
+                  className="tw-w-full tw-text-left tw-px-4 tw-py-2 tw-text-sm tw-text-yellow-200 hover:tw-bg-yellow-400/20"
                 >
                   {curr.symbol} {curr.code}
                 </button>
@@ -135,58 +117,61 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Dynamic Product Grid - Only Change Here */}
-      <div className="tw-grid tw-grid-cols-1 md:tw-grid-cols-4 tw-gap-5 sm:tw-gap-6">
-        {featuredProducts.length > 0 ? (
-          featuredProducts.map((product) => (
-            <div
-              key={product.id || product.name?.en}
-              className="tw-bg-black/40 tw-backdrop-blur-xl tw-border tw-border-yellow-500/20 tw-rounded-2xl tw-shadow-2xl hover:tw-shadow-yellow-400/40 tw-transition-all tw-duration-500 hover:tw-scale-105 tw-flex tw-flex-col"
-            >
-              <img
-                src={getProductImage(product)}
-                className="tw-w-full tw-h-40 tw-object-cover tw-rounded-t-2xl"
-                alt={getProductTitle(product)}
-                onError={(e) => {
-                  e.target.src = "./img/default_rice.jpg"; // fallback if broken
-                }}
-              />
-              <div className="tw-p-4 tw-flex-1 tw-flex tw-flex-col">
-                <h3 className="tw-text-xl tw-font-bold tw-text-yellow-400 tw-mb-2 hover:tw-text-yellow-300 tw-transition-colors">
-                  {getProductTitle(product)}
-                </h3>
-                <p className="tw-text-sm tw-text-yellow-100 tw-flex-1 tw-line-clamp-3">
-                  {getProductDesc(product)}
-                </p>
-                <div className="tw-mt-3">
-                  <span className="tw-text-base tw-font-extrabold tw-text-yellow-400 tw-whitespace-nowrap">
-                    {formatPrice(product)}
-                  </span>
-                </div>
-              </div>
+      {/* Product Grid */}
+      <div className="tw-grid tw-grid-cols-1 md:tw-grid-cols-4 tw-gap-6">
+        {featuredProducts.map((product) => (
+          <div
+            key={product.firebaseId}
+            className="tw-bg-black/40 tw-backdrop-blur-xl tw-border tw-border-yellow-500/20 tw-rounded-2xl tw-shadow-2xl tw-flex tw-flex-col hover:tw-scale-105 tw-transition"
+          >
+            {/* IMAGE */}
+            <img
+              src={getProductImage(product)}
+              alt={getProductTitle(product)}
+              className="tw-w-full tw-h-40 tw-object-cover tw-rounded-t-2xl"
+              onError={(e) => {
+                e.target.src = "./img/default_rice.jpg";
+              }}
+            />
+
+            <div className="tw-p-4 tw-flex tw-flex-col tw-flex-1">
+              <h3 className="tw-text-xl tw-font-bold tw-text-yellow-400">
+                {getProductTitle(product)}
+              </h3>
+
+              <p className="tw-text-sm tw-text-yellow-100 tw-mt-1 tw-line-clamp-3 tw-flex-1">
+                {getProductDesc(product)}
+              </p>
+
+              <span className="tw-mt-3 tw-font-extrabold tw-text-yellow-400">
+                {formatPrice(product)}
+              </span>
+
+              {/* ✅ VIEW DETAILS (ONLY ADDITION) */}
+              <button
+                onClick={() =>
+                  navigate("/Products-All", {
+                    state: {
+                      openDetails: true,
+                      productId: product.firebaseId,
+                      from: "/products",
+                    },
+                  })
+                }
+                className="tw-mt-4 tw-bg-yellow-400 tw-text-black tw-px-4 tw-py-2 tw-rounded-lg tw-font-semibold hover:tw-bg-yellow-300"
+              >
+                View Details
+              </button>
             </div>
-          ))
-        ) : (
-          // Optional skeleton/loader while loading
-          [...Array(4)].map((_, i) => (
-            <div key={i} className="tw-bg-black/40 tw-backdrop-blur-xl tw-border tw-border-yellow-500/20 tw-rounded-2xl tw-shadow-2xl tw-animate-pulse">
-              <div className="tw-w-full tw-h-40 tw-bg-gray-800 tw-rounded-t-2xl"></div>
-              <div className="tw-p-4">
-                <div className="tw-h-6 tw-bg-gray-700 tw-rounded tw-mb-2"></div>
-                <div className="tw-h-4 tw-bg-gray-700 tw-rounded tw-w-11/12"></div>
-                <div className="tw-h-4 tw-bg-gray-700 tw-rounded tw-w-10/12 tw-mt-1"></div>
-                <div className="tw-h-6 tw-bg-yellow-600 tw-rounded tw-mt-4 tw-w-32"></div>
-              </div>
-            </div>
-          ))
-        )}
+          </div>
+        ))}
       </div>
 
-      {/* View All Button - unchanged */}
+      {/* View All */}
       <div className="tw-mt-10 tw-text-center">
         <button
           onClick={goToProd}
-          className="tw-bg-black/40 tw-backdrop-blur-lg tw-border tw-border-yellow-400/50 tw-text-yellow-300 tw-px-8 tw-py-4 tw-rounded-xl tw-text-lg sm:tw-text-xl tw-font-bold tw-transition-all tw-duration-500 hover:tw-scale-110 hover:tw-bg-yellow-400 hover:tw-text-black hover:tw-shadow-lg hover:tw-shadow-yellow-400/50"
+          className="tw-bg-black/40 tw-backdrop-blur-lg tw-border tw-border-yellow-400/50 tw-text-yellow-300 tw-px-8 tw-py-4 tw-rounded-xl tw-text-lg tw-font-bold hover:tw-bg-yellow-400 hover:tw-text-black"
         >
           {t("view_all_products")}
         </button>

@@ -94,13 +94,14 @@ export default function AdminLayout() {
         <div
           id="admin-scroll-container"
           className="
-          tw-p-4 sm:tw-p-6 md:tw-p-8 lg:tw-p-6 xl:tw-p-8
-          tw-bg-gradient-to-b tw-from-black tw-to-gray-900
-          tw-min-h-screen tw-text-white
-          tw-overflow-x-hidden"
+            tw-p-4 sm:tw-p-6 md:tw-p-8 lg:tw-p-6 xl:tw-p-8
+            tw-bg-gradient-to-b tw-from-black tw-to-gray-900
+            tw-h-screen
+            tw-text-white
+            tw-overflow-y-auto
+            tw-overflow-x-hidden
+          "
         >
-
-
           <div className="tw-mb-4 sm:tw-mb-6 md:tw-mb-8">
             <h2
               className="

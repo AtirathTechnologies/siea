@@ -197,9 +197,9 @@ const IndianAgriRSSFeed = () => {
       padding: '8px 0',
       marginBottom: '10px',
       position: 'relative',
-      zIndex: 1000
+      zIndex: 40
     }}>
-      <div className="scrolling-container" style={{
+      <div className="scrolling-container" style={{ 
         position: 'relative',
         overflow: 'hidden',
         width: '100%',

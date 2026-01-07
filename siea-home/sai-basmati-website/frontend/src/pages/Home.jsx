@@ -23,7 +23,7 @@ export default function Home() {
       <IndianAgriRSSFeed />
       <section className="relative tw-text-yellow-600 tw-py-16" style={{ marginTop: "10px" }}>
         <div className="container">
-          <div className="row align-items-center gy-4 tw-bg-white/10 tw-backdrop-blur-md tw-rounded-2xl tw-shadow-lg tw-p-8">
+          <div className="row align-items-center gy-4 tw-bg-black/50 tw-backdrop-blur-md tw-rounded-2xl tw-shadow-lg tw-p-8">
             <div className="col-lg-6">
               <h1 className="tw-text-4xl tw-font-bold tw-leading-tight">
                 {t("hero_title")}
@@ -33,7 +33,7 @@ export default function Home() {
               </p>
               <div className="tw-mt-5 tw-flex tw-gap-3">
                 <Link to="/products" className="btn btn-light">
-                  {t("see_prices")}
+                  {t("view_prices")}
                 </Link>
                 <Link to="/feedback" className="btn btn-outline-light">
                   {t("feedback")}
@@ -74,18 +74,18 @@ export default function Home() {
         </div>
       </section>
       <section className="tw-my-12">
-        <div className="container tw-bg-white/10 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-8">
+        <div className="container tw-bg-black/50 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-8">
           <About />
         </div>
       </section>
       <section className="tw-my-12">
-        <div className="container tw-bg-white/10 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-8">
+        <div className="container tw-bg-black/50 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-8">
           <Products />
         </div>
       </section>
 
       <section className="tw-my-12">
-        <div className="container tw-bg-white/10 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-8">
+        <div className="container tw-bg-black/50 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-8">
           <Service />
         </div>
       </section>
@@ -93,7 +93,7 @@ export default function Home() {
         id="contact-feedback"
         className="tw-my-12 tw-px-3 sm:tw-px-6"
       >
-        <div className="container tw-max-w-7xl tw-mx-auto tw-bg-white/10 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-4 sm:tw-p-6 lg:tw-p-8">
+        <div className="container tw-max-w-7xl tw-mx-auto tw-bg-black/50 tw-backdrop-blur-lg tw-rounded-2xl tw-shadow-md tw-p-4 sm:tw-p-6 lg:tw-p-8">
           <h2 className="tw-text-xl sm:tw-text-2xl lg:tw-text-3xl tw-font-bold tw-text-center tw-text-yellow-400 tw-mb-6 sm:tw-mb-8">
             {t("get_in_touch")}
           </h2>
