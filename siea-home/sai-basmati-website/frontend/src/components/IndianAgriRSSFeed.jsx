@@ -235,7 +235,9 @@ const IndianAgriRSSFeed = () => {
               onClick={(e) => feed.link && feed.link !== "#" && handleFeedClick(feed, e)}
               style={{
                 flexShrink: 0,
-                backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                cursor: feed.link && feed.link !== "#" ? 'pointer' : 'not-allowed',
+                userSelect: 'none'
               }}
             >
               <span className="text-lg">

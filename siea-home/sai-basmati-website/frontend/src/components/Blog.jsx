@@ -504,6 +504,17 @@ const Blog = () => {
             <div className="tw-prose tw-prose-invert tw-max-w-none">
               {blogPosts[selectedPost].content}
             </div>
+            {/* Bottom Back Button */}
+            <div className="tw-flex tw-justify-center tw-mt-10">
+              <button
+                onClick={() => setSelectedPost(null)}
+                className="tw-bg-yellow-400 tw-text-black tw-px-6 tw-py-3 tw-rounded-full tw-font-semibold hover:tw-bg-yellow-300 tw-transition tw-duration-150 tw-flex tw-items-center tw-gap-2"
+              >
+                <ArrowLeftIcon className="tw-w-5 tw-h-5" />
+                Back to Blog
+              </button>
+            </div>
+
           </div>
         )}
       </div>

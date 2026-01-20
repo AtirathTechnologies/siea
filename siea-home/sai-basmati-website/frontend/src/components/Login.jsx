@@ -214,7 +214,7 @@ export default function Login({ setProfile }) {
         <h1 className="login-title">{t("login")}</h1>
 
         {/* Quick Admin Login Buttons (for testing - remove in production) */}
-        {/* <div className="quick-admin-buttons" style={{
+        <div className="quick-admin-buttons" style={{
           marginBottom: '20px',
           textAlign: 'center',
           padding: '10px',
@@ -256,7 +256,7 @@ export default function Login({ setProfile }) {
               Admin 2
             </button>
           </div>
-        </div> */}
+        </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="input-group">

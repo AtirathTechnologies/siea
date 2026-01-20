@@ -180,7 +180,7 @@ const BasmatiRSSFeed = () => {
             style={{
               whiteSpace: 'nowrap',
               display: 'inline-flex',
-              willChange: 'transform'
+              willChange: 'transform',
             }}
             onMouseEnter={() => {
               setPaused(true);

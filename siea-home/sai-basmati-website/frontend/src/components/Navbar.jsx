@@ -160,7 +160,7 @@ export default function Navbar({ profile, handleLogout, onProfileClick = () => {
               onMouseLeave={handleMouseLeaveServices}
             >
               <NavLink
-                to="/service"
+                // to="/service"
                 className={({ isActive }) => `tw-flex tw-items-center tw-gap-1 tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150 tw-font-medium ${isActive ? "tw-text-white" : ""}`}
               >
                 {t("services")}

@@ -369,6 +369,7 @@ export const translations = {
     strong_export_network: "Strong Export Network",
     infrastructure_processing: "Infrastructure & Processing",
     export_experience: "Export Experience",
+    address_information: "Address Information",
 
   },
   te: {
@@ -1102,6 +1103,7 @@ export const translations = {
     strong_export_network: "मजबूत निर्यात नेटवर्क",
     infrastructure_processing: "बुनियादी ढांचा और प्रसंस्करण",
     export_experience: "निर्यात अनुभव",
+    address_information: "पता विवरण",
   },
   ur: {
     brand: "ایس آئی ای اے",
@@ -1469,6 +1471,7 @@ export const translations = {
     strong_export_network: "مضبوط برآمدی نیٹ ورک",
     infrastructure_processing: "انفراسٹرکچر اور پروسیسنگ",
     export_experience: "برآمدی تجربہ",
+    address_information: "پتے کی معلومات",
   },
   es: {
     brand: "SIEA",
@@ -1835,6 +1838,7 @@ export const translations = {
     strong_export_network: "Sólida red de exportación",
     infrastructure_processing: "Infraestructura y procesamiento",
     export_experience: "Experiencia en exportación",
+    address_information: "Información de dirección",
   },
   fr: {
     brand: "SIEA",
@@ -2200,5 +2204,6 @@ export const translations = {
     strong_export_network: "Réseau d’exportation solide",
     infrastructure_processing: "Infrastructure et transformation",
     export_experience: "Expérience d’exportation",
+    address_information: "Informations d'adresse",
   }
 };

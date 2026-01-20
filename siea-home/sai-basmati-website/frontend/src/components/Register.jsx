@@ -3,7 +3,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { ref, set, get, runTransaction } from "firebase/database";
+import { ref, set, runTransaction } from "firebase/database";
 import { useNavigate } from "react-router-dom";
 import { auth, db, deleteUser } from "../firebase";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -19,20 +19,22 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
-    countryCode: "+971",
+    countryCode: "+91",
     phoneNumber: "",
-
-    // NEW ADDRESS FIELDS
     street: "",
     city: "",
     addressState: "",
     addressCountry: "",
     pincode: "",
+    avatar: "",
   });
 
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState("");
   const [phoneErr, setPhoneErr] = useState("");
   const [globalErr, setGlobalErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const countryOptions = [
     { code: "+91", label: "+91 (India)", len: 10 },
@@ -52,6 +54,53 @@ export default function Register() {
     setForm(p => ({ ...p, phoneNumber: "" }));
     setPhoneErr("");
   }, [form.countryCode]);
+
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setGlobalErr("Please upload a valid image (JPEG, PNG, GIF, WebP)");
+      return;
+    }
+
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setGlobalErr(`Image size should be less than 2MB`);
+      return;
+    }
+
+    setPhotoFile(file);
+    setGlobalErr("");
+
+    try {
+      const base64 = await convertToBase64(file);
+      setPhotoPreview(base64);
+      setForm(prev => ({ ...prev, avatar: base64 }));
+    } catch (error) {
+      console.error("Error converting to Base64:", error);
+      setGlobalErr("Error processing image");
+    }
+  };
+
+  const clearPhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview("");
+    setForm(prev => ({ ...prev, avatar: "" }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const validatePhone = () => {
     const v = form.phoneNumber.trim();
@@ -73,62 +122,60 @@ export default function Register() {
     if (form.password.length < 6) return setGlobalErr(t("password_min_length"));
     if (form.password !== form.confirmPassword) return setGlobalErr(t("passwords_mismatch"));
 
-    // Address validation
     if (!form.street.trim()) return setGlobalErr("Street is required");
     if (!form.city.trim()) return setGlobalErr("City is required");
     if (!form.addressState.trim()) return setGlobalErr("State is required");
     if (!form.addressCountry.trim()) return setGlobalErr("Country is required");
     if (!form.pincode.trim()) return setGlobalErr("Pincode is required");
 
-    const phone = form.countryCode + form.phoneNumber.trim();
+    if (form.avatar && form.avatar.length > 5 * 1024 * 1024) {
+      return setGlobalErr("Image is too large. Please choose a smaller image.");
+    }
 
+    const phone = form.countryCode + form.phoneNumber.trim();
     setLoading(true);
+
     let cred = null;
 
     try {
-      // Step 1: Create Auth user
       cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
-      console.log("Auth user created →", cred.user.uid);
-
       await updateProfile(cred.user, { displayName: form.fullName });
 
-      // Step 2: Generate custom ID
       const countRef = ref(db, "counters/userCount");
-
-      const newId = await runTransaction(countRef, (current) => {
-        return (current || 0) + 1;
-      });
-
+      const newId = await runTransaction(countRef, (current) => (current || 0) + 1);
       const nextId = newId.snapshot.val();
       const customId = "user-" + nextId;
 
-      // Step 3: Save user profile in realtime DB
       const userRef = ref(db, `users/${customId}`);
-
       await set(userRef, {
         uid: cred.user.uid,
         fullName: form.fullName,
         email: form.email,
         phone,
-
-        // SAVE ADDRESS
         street: form.street,
         city: form.city,
         addressState: form.addressState,
         addressCountry: form.addressCountry,
         pincode: form.pincode,
-
+        avatar: form.avatar || "",
         createdAt: new Date().toISOString(),
       });
+
+      // 🔴 FORCE LOGOUT AFTER REGISTER
+      await auth.signOut();
+
+      // Clear any stored profile data
+      localStorage.removeItem("profile");
+      sessionStorage.clear();
+
 
       navigate("/login");
     } catch (err) {
       console.error("Registration error →", err);
 
-      if (cred?.user && err.code === "permission-denied") {
+      if (cred?.user && (err.code === "permission-denied" || err.code.includes("auth/"))) {
         try {
           await deleteUser(cred.user);
-          console.log("Orphan Auth user removed");
         } catch (delErr) {
           console.error("Could not delete orphan user:", delErr);
         }
@@ -154,7 +201,6 @@ export default function Register() {
         <h1>{t("register_title")}</h1>
 
         <form className="form" onSubmit={handleSubmit}>
-          {/* FULL NAME */}
           <div className="input-group">
             <label>{t("full_name")}</label>
             <input
@@ -166,7 +212,6 @@ export default function Register() {
             />
           </div>
 
-          {/* EMAIL */}
           <div className="input-group">
             <label>{t("email")}</label>
             <input
@@ -178,7 +223,6 @@ export default function Register() {
             />
           </div>
 
-          {/* PHONE */}
           <div className="input-group">
             <label>{t("phone")}</label>
             <div className="phone-input">
@@ -202,7 +246,6 @@ export default function Register() {
             {phoneErr && <p className="error-text">{phoneErr}</p>}
           </div>
 
-          {/* ADDRESS SECTION */}
           <h3 style={{ marginTop: "20px" }}>{t("address_information")}</h3>
 
           <div className="input-group">
@@ -260,7 +303,44 @@ export default function Register() {
             />
           </div>
 
-          {/* PASSWORD */}
+          <div className="input-group">
+            <label>Profile Photo (Optional)</label>
+
+            {!photoFile ? (
+              <div className="file-upload-area">
+                <button
+                  type="button"
+                  className="file-upload-btn"
+                  onClick={() => fileInputRef.current.click()}
+                >
+                  Choose Photo
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                />
+              </div>
+            ) : (
+              <div className="photo-uploaded">
+                <div className="photo-preview">
+                  <img src={photoPreview} alt="Preview" />
+                  <button
+                    type="button"
+                    className="clear-photo-btn"
+                    onClick={clearPhoto}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <p className="input-hint">Max size: 2MB. Supported: JPEG, PNG, GIF, WebP</p>
+          </div>
+
           <div className="input-group">
             <label>{t("password")}</label>
             <input
@@ -272,7 +352,6 @@ export default function Register() {
             />
           </div>
 
-          {/* CONFIRM PASSWORD */}
           <div className="input-group">
             <label>{t("confirm_password")}</label>
             <input

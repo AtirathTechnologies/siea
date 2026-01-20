@@ -37,6 +37,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { ref, onValue, off } from "firebase/database";
 import SampleCourierService from "./components/SampleCourierService";
+import { CartProvider } from "./contexts/CartContext.jsx";
+import Cart from "./pages/Cart.jsx";
 
 function ScrollToHash() {
   const location = useLocation();
@@ -309,142 +311,146 @@ export default function App() {
   const isProductsPage =
     location.pathname === "/Products-All" ||
     location.pathname === "/transport" ||
-    location.pathname === "/sea-freight";
+    location.pathname === "/sea-freight" ||
+    location.pathname === "/cart";
 
   return (
     <LanguageProvider>
-      <div className="tw-relative tw-min-h-screen tw-flex tw-flex-col">
-        <div className="tw-fixed tw-inset-0 -tw-z-10">
-          <GoldenRiceAnimation />
-        </div>
-        <div className="tw-fixed tw-inset-0 tw-flex tw-items-center tw-justify-center -tw-z-10 pointer-events-none">
-          <img
-            src={Logo}
-            alt="Company Logo"
-            className="tw-w-72 tw-h-72 md:tw-w-[28rem] md:tw-h-[28rem] lg:tw-w-[34rem] lg:tw-h-[34rem] tw-opacity-90"
-          />
-        </div>
-        <div className="tw-flex tw-flex-col tw-min-h-screen tw-backdrop-blur-sm tw-bg-black/20 tw-text-white">
-          {!isAdminDashboard && (
-            <>
-              {isProductsPage ? (
-                <div className="tw-fixed tw-top-0 tw-left-0 tw-right-0 tw-h-[60px] tw-z-50 tw-bg-[#111111]">
-                  <NavbarProd
-                    searchProducts={searchProducts}
-                    showProductsPage={() => navigate("/Products-All")}
-                    showProfilePanel={openProfilePanel}
-                    goHome={goHome}
-                    isNavOpen={isNavOpen}
-                    toggleNav={setIsNavOpen}
+      <CartProvider>
+        <div className="tw-relative tw-min-h-screen tw-flex tw-flex-col">
+          <div className="tw-fixed tw-inset-0 -tw-z-10">
+            <GoldenRiceAnimation />
+          </div>
+          <div className="tw-fixed tw-inset-0 tw-flex tw-items-center tw-justify-center -tw-z-10 pointer-events-none">
+            <img
+              src={Logo}
+              alt="Company Logo"
+              className="tw-w-72 tw-h-72 md:tw-w-[28rem] md:tw-h-[28rem] lg:tw-w-[34rem] lg:tw-h-[34rem] tw-opacity-90"
+            />
+          </div>
+          <div className="tw-flex tw-flex-col tw-min-h-screen tw-backdrop-blur-sm tw-bg-black/20 tw-text-white">
+            {!isAdminDashboard && (
+              <>
+                {isProductsPage ? (
+                  <div className="tw-fixed tw-top-0 tw-left-0 tw-right-0 tw-h-[60px] tw-z-50 tw-bg-[#111111]">
+                    <NavbarProd
+                      searchProducts={searchProducts}
+                      showProductsPage={() => navigate("/Products-All")}
+                      showProfilePanel={openProfilePanel}
+                      goHome={goHome}
+                      isNavOpen={isNavOpen}
+                      toggleNav={setIsNavOpen}
+                      profile={profile}
+                      handleLogout={handleLogout}
+                    />
+                  </div>
+                ) : (
+                  <Navbar
                     profile={profile}
+                    onProfileClick={openProfilePanel}
                     handleLogout={handleLogout}
                   />
-                </div>
-              ) : (
-                <Navbar
-                  profile={profile}
-                  onProfileClick={openProfilePanel}
-                  handleLogout={handleLogout}
-                />
-              )}
-              {isProductsPage && (
+                )}
+                {isProductsPage && (
+                  <div
+                    className={`navbar-menu-backdrop ${isNavOpen ? "open" : ""}`}
+                    onClick={() => setIsNavOpen(false)}
+                  />
+                )}
+              </>
+            )}
+            {showWarningPopup && (
+              <>
                 <div
-                  className={`navbar-menu-backdrop ${isNavOpen ? "open" : ""}`}
-                  onClick={() => setIsNavOpen(false)}
+                  className="tw-fixed tw-inset-0 tw-bg-black/60 tw-z-45"
+                  onClick={closeWarningPopup}
                 />
-              )}
-            </>
-          )}
-          {showWarningPopup && (
-            <>
-              <div
-                className="tw-fixed tw-inset-0 tw-bg-black/60 tw-z-45"
-                onClick={closeWarningPopup}
+                <div
+                  className="tw-fixed tw-z-50 tw-bg-white/10 tw-backdrop-blur-md tw-text-white tw-p-6 tw-rounded-2xl tw-shadow-2xl tw-max-w-md tw-w-11/12 tw-mx-auto tw-border tw-border-white/20"
+                  style={{ top: "90px", left: "50%", transform: "translateX(-50%)" }}
+                >
+                  <div className="tw-text-center tw-text-xl tw-font-bold tw-mb-4 tw-text-red-400">
+                    Warning
+                  </div>
+                  <div className="tw-text-center tw-mb-6 tw-text-red-600 tw-font-bold">
+                    Please log in to access product details.
+                  </div>
+                  <div className="tw-flex tw-justify-center tw-space-x-8">
+                    <button
+                      className="tw-bg-blue-600 tw-hover:bg-blue-700 tw-text-white tw-py-3 tw-px-6 tw-rounded-xl"
+                      onClick={() => {
+                        closeWarningPopup();
+                        navigate("/login");
+                      }}
+                    >
+                      Login
+                    </button>
+                    <button
+                      className="tw-bg-gray-600 tw-hover:bg-gray-700 tw-text-white tw-py-3 tw-px-6 tw-rounded-xl"
+                      onClick={closeWarningPopup}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            <ScrollToHash />
+            <main className={`tw-flex-1 ${isProductsPage && !isAdminDashboard ? "tw-pt-[60px]" : ""}`}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/market-rates" element={<Prices />} />
+                <Route path="/feedback" element={<Feedback />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/Products-All" element={<ProductApp profile={profile} setProfile={setProfile} showWarning={showWarning} searchQuery={searchQuery} />} />
+                <Route path="/register" element={<Register setProfile={setProfile} />} />
+                <Route path="/login" element={<Login setProfile={setProfile} />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/service" element={<Service />} />
+                <Route path="/sample-courier" element={<SampleCourierService />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/transport" element={<Transport />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/sea-freight" element={<SeaFreight />} />
+                <Route path="/join-us" element={<JoinUs />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route
+                  path="/admin/*"
+                  element={
+                    <ProtectedAdminRoute>
+                      <AdminLayout />
+                    </ProtectedAdminRoute>
+                  }
+                >
+                  <Route index element={<Dashboard />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="products" element={<ProductsAdmin />} />
+                  <Route path="market-prices" element={<AdminMarketPrices />} />
+                  <Route path="orders" element={<Orders />} />
+                  <Route path="services" element={<Services />} />
+                  <Route path="pending-quotes" element={<PendingQuotes />} />
+                  <Route path="todays-orders" element={<TodaysOrders />} />
+                  <Route path="history" element={<History />} />
+                </Route>
+              </Routes>
+            </main>
+
+            {!isAdminDashboard && <Footer />}
+
+            {profile && !isAdminDashboard && (
+              <ProfilePanel
+                isOpen={isProfileOpen}
+                profile={profile}
+                setProfile={setProfile}
+                onClose={closeProfilePanel}
+                onLogout={handleLogout}
               />
-              <div
-                className="tw-fixed tw-z-50 tw-bg-white/10 tw-backdrop-blur-md tw-text-white tw-p-6 tw-rounded-2xl tw-shadow-2xl tw-max-w-md tw-w-11/12 tw-mx-auto tw-border tw-border-white/20"
-                style={{ top: "90px", left: "50%", transform: "translateX(-50%)" }}
-              >
-                <div className="tw-text-center tw-text-xl tw-font-bold tw-mb-4 tw-text-red-400">
-                  Warning
-                </div>
-                <div className="tw-text-center tw-mb-6 tw-text-red-600 tw-font-bold">
-                  Please log in to access product details.
-                </div>
-                <div className="tw-flex tw-justify-center tw-space-x-8">
-                  <button
-                    className="tw-bg-blue-600 tw-hover:bg-blue-700 tw-text-white tw-py-3 tw-px-6 tw-rounded-xl"
-                    onClick={() => {
-                      closeWarningPopup();
-                      navigate("/login");
-                    }}
-                  >
-                    Login
-                  </button>
-                  <button
-                    className="tw-bg-gray-600 tw-hover:bg-gray-700 tw-text-white tw-py-3 tw-px-6 tw-rounded-xl"
-                    onClick={closeWarningPopup}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          <ScrollToHash />
-          <main className={`tw-flex-1 ${isProductsPage && !isAdminDashboard ? "tw-pt-[60px]" : ""}`}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/market-rates" element={<Prices />} />
-              <Route path="/feedback" element={<Feedback />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/Products-All" element={<ProductApp profile={profile} setProfile={setProfile} showWarning={showWarning} searchQuery={searchQuery} />} />
-              <Route path="/register" element={<Register setProfile={setProfile} />} />
-              <Route path="/login" element={<Login setProfile={setProfile} />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/service" element={<Service />} />
-              <Route path="/sample-courier" element={<SampleCourierService />} />
-              <Route path="/blog" element={<Blog />} />
-              <Route path="/transport" element={<Transport />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/sea-freight" element={<SeaFreight />} />
-              <Route path="/join-us" element={<JoinUs />} />
-              <Route
-                path="/admin/*"
-                element={
-                  <ProtectedAdminRoute>
-                    <AdminLayout />
-                  </ProtectedAdminRoute>
-                }
-              >
-                <Route index element={<Dashboard />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="users" element={<Users />} />
-                <Route path="products" element={<ProductsAdmin />} />
-                <Route path="market-prices" element={<AdminMarketPrices />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="services" element={<Services />} />
-                <Route path="pending-quotes" element={<PendingQuotes />} />
-                <Route path="todays-orders" element={<TodaysOrders />} />
-                <Route path="history" element={<History />} />
-              </Route>
-            </Routes>
-          </main>
-
-          {!isAdminDashboard && <Footer />}
-
-          {profile && !isAdminDashboard && (
-            <ProfilePanel
-              isOpen={isProfileOpen}
-              profile={profile}
-              setProfile={setProfile}
-              onClose={closeProfilePanel}
-              onLogout={handleLogout}
-            />
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </CartProvider>
     </LanguageProvider>
   );
 }

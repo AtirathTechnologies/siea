@@ -1,9 +1,11 @@
+/* Main container - KEEPING YOUR ORIGINAL BACKGROUND */
 .mobile-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  /* Remove background-color to keep your original background */
 }
 
 .form-box {
@@ -13,6 +15,8 @@
   border-radius: 12px;
   text-align: center;
   color: #fbbf24;
+  /* Remove background-color to keep your original background */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .logo {
@@ -26,6 +30,7 @@ h1 {
   font-size: 1.5rem;
   font-weight: bold;
   margin-bottom: 20px;
+  color: #fbbf24;
 }
 
 .form {
@@ -44,6 +49,7 @@ h1 {
 .input-group label {
   font-size: 0.9rem;
   font-weight: 500;
+  color: #fbbf24;
 }
 
 .input-group input,
@@ -55,6 +61,14 @@ h1 {
   background-color: #111;
   color: white;
   font-size: 16px;
+  box-sizing: border-box;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2);
 }
 
 /* Phone inputs */
@@ -71,51 +85,96 @@ h1 {
   width: 70%;
 }
 
-/* Address section */
-.address-section-title {
-  font-size: 1rem;
-  font-weight: bold;
-  margin-top: 10px;
-  color: #fbbf24;
+/* Photo upload styles */
+.file-upload-area {
+  margin-bottom: 10px;
 }
 
-.address-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.address-group input {
+.file-upload-btn {
   width: 100%;
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #fbbf24;
   background-color: #111;
-  color: white;
-  font-size: 16px;
+  color: #fbbf24;
+  border: 1px solid #fbbf24;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
 }
 
-/* pincode small box */
-.pincode-input {
-  max-width: 200px;
+.file-upload-btn:hover {
+  background-color: #fbbf24;
+  color: #000;
+}
+
+.photo-uploaded {
+  margin-top: 10px;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 10px;
+  background-color: #111;
+}
+
+.photo-preview {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.photo-preview img {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid #fbbf24;
+}
+
+.clear-photo-btn {
+  padding: 8px 16px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s;
+}
+
+.clear-photo-btn:hover {
+  background-color: #c82333;
+}
+
+.input-hint {
+  font-size: 12px;
+  color: #fffefe;
+  margin-top: 5px;
+  margin-bottom: 0;
+  font-style: italic;
 }
 
 /* Error text */
 .error-text {
-  color: #fd0202;
-  background-color: aliceblue;
-  font-size: 1rem;
+  color: #ff6b6b;
+  font-size: 0.9rem;
   margin-top: 5px;
+  padding: 8px;
+  background-color: rgba(255, 107, 107, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #ff6b6b;
 }
 
+/* Login link */
 .login-link {
   margin-top: 20px;
   font-size: 0.9rem;
+  color: #f8f6f6;
 }
 
 .login-link a {
   color: #fbbf24;
   text-decoration: none;
+  font-weight: 500;
 }
 
 .login-link a:hover {
@@ -134,6 +193,7 @@ h1 {
   font-size: 1rem;
   cursor: pointer;
   margin-top: 10px;
+  transition: background-color 0.3s;
 }
 
 .submit-btn:disabled {
@@ -145,19 +205,65 @@ h1 {
   background-color: #f59e0b;
 }
 
+/* Section titles */
+h3 {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-top: 20px;
+  margin-bottom: 15px;
+  color: #fbbf24;
+  border-bottom: 1px solid #fbbf24;
+  padding-bottom: 5px;
+}
+
 /* Mobile responsive */
 @media (max-width: 340px) {
   .form-box {
     padding: 15px;
   }
+  
   .phone-input {
     flex-direction: column;
   }
+  
   .phone-input select,
   .phone-input input {
     width: 100%;
   }
-  .pincode-input {
-    max-width: 100%;
+  
+  .photo-preview {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
+  
+  .photo-preview img {
+    width: 100%;
+    height: auto;
+    max-height: 150px;
+  }
+}
+
+/* Scrollbar styling for form-box if content overflows */
+.form-box {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.form-box::-webkit-scrollbar {
+  width: 6px;
+}
+
+.form-box::-webkit-scrollbar-track {
+  background: #333;
+  border-radius: 10px;
+}
+
+.form-box::-webkit-scrollbar-thumb {
+  background: #fbbf24;
+  border-radius: 10px;
+}
+
+.form-box::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
 }

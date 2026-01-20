@@ -157,54 +157,36 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
   }, [showOrdersPopup, profile?.email]);
 
   // Prevent background scroll
+  // Prevent background scroll (SAFE VERSION)
   useEffect(() => {
     const adminContainer = document.getElementById("admin-scroll-container");
-
-    const preventScroll = (e) => {
-      e.preventDefault();
-    };
 
     if (isOpen) {
       document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
-      document.body.style.position = "fixed";
-      document.body.style.width = "100%";
 
       if (adminContainer) {
         adminContainer.style.overflow = "hidden";
         adminContainer.style.height = "100vh";
       }
-
-      document.addEventListener("touchmove", preventScroll, { passive: false });
-      document.addEventListener("wheel", preventScroll, { passive: false });
     } else {
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
 
       if (adminContainer) {
         adminContainer.style.overflow = "";
         adminContainer.style.height = "";
       }
-
-      document.removeEventListener("touchmove", preventScroll);
-      document.removeEventListener("wheel", preventScroll);
     }
 
     return () => {
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
 
       if (adminContainer) {
         adminContainer.style.overflow = "";
         adminContainer.style.height = "";
       }
-
-      document.removeEventListener("touchmove", preventScroll);
-      document.removeEventListener("wheel", preventScroll);
     };
   }, [isOpen]);
 
@@ -251,8 +233,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     setMessage({ type: "success", text: "Photo removed. Save to confirm." });
   };
 
-  // Save Handler (Updated for Base64)
-  // In ProfilePanel.js, update the handleSave function:
+
 
   const handleSave = async () => {
     setIsLoading(true);
@@ -361,7 +342,11 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
 
   const getAvatarInitial = () => {
     const name = getDisplayName();
-    return (editData.avatar || profile?.avatar) ? null : name.charAt(0).toUpperCase();
+    // Always return initial if avatar is not valid
+    if (!getValidAvatar(editData.avatar) && !getValidAvatar(profile?.avatar)) {
+      return name.charAt(0).toUpperCase();
+    }
+    return null; // Return null if there's a valid avatar
   };
 
   if (!isOpen) return null;
