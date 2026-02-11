@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { auth, db } from "../firebase";
 import { ref as dbRef, onValue, set, off } from "firebase/database";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -33,10 +33,11 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
   const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   const isDefaultAdmin = profile?.isDefaultAdmin;
+  const createdRecordRef = useRef(false);
 
   const isValidFirebaseUid = (uid) => uid && !/[@.#$\[\]]/.test(uid);
 
-  // Load profile data
+  // STEP 4: Load profile data with auto-creation for new users
   useEffect(() => {
     if (!isOpen || !profile) return;
 
@@ -58,17 +59,21 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
 
     if (profile?.uid && isValidFirebaseUid(profile.uid)) {
       const usersRef = dbRef(db, "users");
-      const unsub = onValue(usersRef, (snap) => {
+      const unsub = onValue(usersRef, async (snap) => {
         const data = snap.val() || {};
         let matchedUser = null;
+        let userKey = null;
 
+        // Find existing user
         Object.keys(data).forEach((key) => {
           if (data[key].uid === profile.uid) {
             matchedUser = { customId: key, ...data[key] };
+            userKey = key;
           }
         });
 
         if (matchedUser) {
+          // Existing user found
           setEditData({
             name: matchedUser.fullName || matchedUser.name || "",
             email: matchedUser.email || auth.currentUser?.email || "",
@@ -79,15 +84,75 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
             addressState: matchedUser.addressState || "",
             addressCountry: matchedUser.addressCountry || "",
             pincode: matchedUser.pincode || "",
-            customId: matchedUser.customId,
+            customId: userKey,
           });
+          createdRecordRef.current = true;
+        } else if (!createdRecordRef.current) {
+          // STEP 4: Create new user record if not found (only once)
+          createdRecordRef.current = true;
+          const userEmail = auth.currentUser?.email || profile.email;
+          const userName = profile.displayName || userEmail?.split("@")[0] || "User";
+          const newUserKey = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          const newUserData = {
+            uid: profile.uid,
+            fullName: userName,
+            email: userEmail,
+            phone: "",
+            avatar: "",
+            street: "",
+            city: "",
+            addressState: "",
+            addressCountry: "",
+            pincode: "",
+            createdAt: new Date().toISOString(),
+          };
+
+          try {
+            await set(dbRef(db, `users/${newUserKey}`), newUserData);
+            
+            // Update editData with the newly created user
+            setEditData({
+              ...newUserData,
+              customId: newUserKey,
+            });
+            
+            // Update profile state
+            const updatedProfile = {
+              ...profile,
+              ...newUserData,
+              customId: newUserKey,
+            };
+            setProfile(updatedProfile);
+            localStorage.setItem("profile", JSON.stringify(updatedProfile));
+            
+          } catch (error) {
+            console.error("Error creating user record:", error);
+            // Fallback to basic data if creation fails
+            setEditData({
+              name: userName,
+              email: userEmail || "",
+              phone: "",
+              avatar: "",
+              street: "",
+              city: "",
+              addressState: "",
+              addressCountry: "",
+              pincode: "",
+              customId: ""
+            });
+          }
         }
       });
 
-      return () => off(usersRef, "value", unsub);
+      return () => {
+        off(usersRef, "value", unsub);
+      };
     } else {
+      // For users without valid UID (guests, etc.)
+      const userName = profile.displayName || profile.email?.split("@")[0] || "Guest";
       setEditData({
-        name: profile.displayName || "",
+        name: userName,
         email: profile.email || "",
         phone: "",
         avatar: profile.avatar || "",
@@ -99,6 +164,11 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
         customId: ""
       });
     }
+
+    // Reset createdRecordRef when panel closes
+    return () => {
+      createdRecordRef.current = false;
+    };
   }, [isOpen, profile, isDefaultAdmin]);
 
   // Load orders
@@ -157,7 +227,6 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
   }, [showOrdersPopup, profile?.email]);
 
   // Prevent background scroll
-  // Prevent background scroll (SAFE VERSION)
   useEffect(() => {
     const adminContainer = document.getElementById("admin-scroll-container");
 
@@ -233,8 +302,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     setMessage({ type: "success", text: "Photo removed. Save to confirm." });
   };
 
-
-
+  // STEP 5: Enhanced handleSave function
   const handleSave = async () => {
     setIsLoading(true);
     setMessage({ type: "", text: "" });
@@ -245,46 +313,57 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
           ...profile,
           displayName: editData.name || profile.displayName || profile.email?.split("@")[0],
           fullName: editData.name || profile.fullName,
-          avatar: editData.avatar || "", // Make sure avatar is included
+          avatar: editData.avatar || "",
         };
 
-        setProfile(updatedProfile); // This should update Navbar
+        setProfile(updatedProfile);
         localStorage.setItem("profile", JSON.stringify(updatedProfile));
 
         setMessage({ type: "success", text: "Profile updated successfully!" });
       } else {
-        await set(dbRef(db, `users/${editData.customId}`), {
+        // STEP 5: Check if we need to create a new user or update existing
+        let userRefPath = `users/${editData.customId}`;
+        
+        // If no customId exists, create a new one
+        if (!editData.customId) {
+          const newUserKey = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          userRefPath = `users/${newUserKey}`;
+        }
+
+        const userData = {
           uid: profile.uid,
           fullName: editData.name || "",
           email: editData.email || auth.currentUser?.email || "",
           phone: editData.phone || "",
-          avatar: editData.avatar || "", // Make sure avatar is saved to Firebase
+          avatar: editData.avatar || "",
           street: editData.street || "",
           city: editData.city || "",
           addressState: editData.addressState || "",
           addressCountry: editData.addressCountry || "",
           pincode: editData.pincode || "",
           createdAt: editData.createdAt || new Date().toISOString(),
-        });
-
-        // CRITICAL FIX: Update ALL profile data, not just name and avatar
-        const updatedProfile = {
-          ...profile,
-          fullName: editData.name,
-          avatar: editData.avatar,
-          // Also include all other fields that might be missing
-          email: editData.email || profile.email,
-          phone: editData.phone || profile.phone,
-          street: editData.street || profile.street,
-          city: editData.city || profile.city,
-          addressState: editData.addressState || profile.addressState,
-          addressCountry: editData.addressCountry || profile.addressCountry,
-          pincode: editData.pincode || profile.pincode,
-          customId: editData.customId || profile.customId,
+          lastUpdated: new Date().toISOString(),
         };
 
-        setProfile(updatedProfile); // This updates Navbar
+        await set(dbRef(db, userRefPath), userData);
+
+        const updatedProfile = {
+          ...profile,
+          ...userData,
+          customId: editData.customId || userRefPath.split('/')[1],
+          displayName: editData.name,
+        };
+
+        setProfile(updatedProfile);
         localStorage.setItem("profile", JSON.stringify(updatedProfile));
+
+        // Update editData with the new customId if it was created
+        if (!editData.customId) {
+          setEditData(prev => ({
+            ...prev,
+            customId: userRefPath.split('/')[1],
+          }));
+        }
 
         setMessage({ type: "success", text: "Profile updated successfully!" });
       }
@@ -293,7 +372,12 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
       setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     } catch (err) {
       console.error("Save error:", err);
-      setMessage({ type: "error", text: "Failed to save changes. Please try again." });
+      setMessage({ 
+        type: "error", 
+        text: err.code === "PERMISSION_DENIED" 
+          ? "Permission denied. Please check your database rules." 
+          : "Failed to save changes. Please try again." 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -304,32 +388,85 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     setShowOrderDetails(true);
   };
 
-  // In ProfilePanel.js, update the handleLogout function:
-
-  const handleLogout = () => {
-    // Clear all local storage
-    localStorage.clear();
-    sessionStorage.clear();
-
-    // Sign out from Firebase
-    auth.signOut().then(() => {
-      console.log("User signed out successfully");
-
-      // Clear profile state
-      onLogout(); // This calls handleLogout from App.js
-
-      // Close profile panel
+  // COMPLETE LOGOUT FUNCTION - Clears Firebase persistence
+  const handleLogout = async () => {
+    try {
+      // First sign out from Firebase
+      await auth.signOut();
+      
+      // Clear Firebase persistence storage (IndexedDB, localStorage, etc.)
+      await clearFirebasePersistence();
+      
+      // Clear ALL localStorage items
+      localStorage.clear();
+      
+      // Clear ALL sessionStorage items
+      sessionStorage.clear();
+      
+      // Clear cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      console.log("User signed out and all data cleared successfully");
+      
+      // Notify parent components
+      onLogout();
       onClose();
-
-      // Redirect to home
-      window.location.href = "/";
-    }).catch((error) => {
+      
+      // Force hard redirect to home with page reload
+      setTimeout(() => {
+        window.location.href = "/";
+        window.location.reload();
+      }, 100);
+      
+    } catch (error) {
       console.error("Error signing out:", error);
-      // Still try to clear local state even if Firebase signout fails
+      // Still clear everything and redirect even if Firebase signout fails
+      await clearFirebasePersistence();
+      localStorage.clear();
+      sessionStorage.clear();
       onLogout();
       onClose();
       window.location.href = "/";
-    });
+      window.location.reload();
+    }
+  };
+
+  // Function to clear Firebase persistence
+  const clearFirebasePersistence = async () => {
+    try {
+      // Clear Firebase IndexedDB databases
+      const databases = await window.indexedDB.databases();
+      for (const dbInfo of databases) {
+        if (dbInfo.name && (
+          dbInfo.name.includes('firebase') || 
+          dbInfo.name.includes('Firebase') ||
+          dbInfo.name.includes('firestore') ||
+          dbInfo.name.includes('auth')
+        )) {
+          window.indexedDB.deleteDatabase(dbInfo.name);
+        }
+      }
+      
+      // Clear localStorage items with firebase prefix
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Clear sessionStorage items with firebase prefix
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } catch (error) {
+      console.error("Error clearing Firebase persistence:", error);
+    }
   };
 
   const getDisplayName = () =>
@@ -342,11 +479,17 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
 
   const getAvatarInitial = () => {
     const name = getDisplayName();
-    // Always return initial if avatar is not valid
-    if (!getValidAvatar(editData.avatar) && !getValidAvatar(profile?.avatar)) {
-      return name.charAt(0).toUpperCase();
+    const currentAvatar = editData.avatar || profile?.avatar;
+    
+    if (currentAvatar && currentAvatar.trim() !== '') {
+      if (currentAvatar.startsWith('data:image/') || 
+          currentAvatar.startsWith('http://') || 
+          currentAvatar.startsWith('https://')) {
+        return null;
+      }
     }
-    return null; // Return null if there's a valid avatar
+    
+    return name.charAt(0).toUpperCase();
   };
 
   if (!isOpen) return null;
@@ -368,15 +511,23 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
         {/* Header */}
         <div className="tw-flex tw-items-center tw-p-5 tw-border-b tw-border-gray-700 tw-bg-gray-800/50 tw-sticky tw-top-0">
           <div className="tw-w-14 tw-h-14 tw-rounded-full tw-overflow-hidden tw-shadow-lg tw-ring-4 tw-ring-yellow-500">
-            {editData.avatar || profile?.avatar ? (
+            {(editData.avatar || profile?.avatar) && getAvatarInitial() === null ? (
               <img
                 src={editData.avatar || profile.avatar}
                 alt="Avatar"
                 className="tw-w-full tw-h-full tw-object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  const parent = e.target.parentNode;
+                  const fallbackDiv = document.createElement('div');
+                  fallbackDiv.className = 'tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-2xl tw-font-bold';
+                  fallbackDiv.textContent = getDisplayName().charAt(0).toUpperCase();
+                  parent.appendChild(fallbackDiv);
+                }}
               />
             ) : (
               <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-2xl tw-font-bold">
-                {getAvatarInitial()}
+                {getDisplayName().charAt(0).toUpperCase()}
               </div>
             )}
           </div>
@@ -482,7 +633,19 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
                     <div className="tw-relative tw-w-32 tw-h-32 tw-mb-4">
                       <div className="tw-w-32 tw-h-32 tw-rounded-full tw-overflow-hidden tw-ring-4 tw-ring-yellow-400/50 tw-shadow-xl">
                         {editData.avatar ? (
-                          <img src={editData.avatar} alt="Profile" className="tw-w-full tw-h-full tw-object-cover" />
+                          <img 
+                            src={editData.avatar} 
+                            alt="Profile" 
+                            className="tw-w-full tw-h-full tw-object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              const parent = e.target.parentNode;
+                              const fallbackDiv = document.createElement('div');
+                              fallbackDiv.className = 'tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-4xl tw-font-bold';
+                              fallbackDiv.textContent = editData.name ? editData.name.charAt(0).toUpperCase() : "?";
+                              parent.appendChild(fallbackDiv);
+                            }}
+                          />
                         ) : (
                           <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-4xl tw-font-bold">
                             {editData.name ? editData.name.charAt(0).toUpperCase() : "?"}

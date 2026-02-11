@@ -222,6 +222,7 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
             <ProductDetailsPanel
               product={detailsProduct}
               allProducts={allProducts}
+              profile={profile}
               onBack={() => {
                 if (location.state?.from === "/products") {
                   navigate(-1);

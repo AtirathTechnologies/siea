@@ -22,7 +22,7 @@ app.add_middleware(
 
 
 razorpay_client = razorpay.Client(
-    auth=("rzp_test_RfSBzDny9nssx0", "DlkCwr3REoiDYce6UzQuJmMx")
+    auth=("rzp_test_SE2aAHPiyM4C8R", "hbXSyV7Nar5ovhrHg17k1WHE")
 )
 
 FOOD_KEYWORDS = [

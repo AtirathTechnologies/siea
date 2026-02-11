@@ -39,6 +39,8 @@ import { ref, onValue, off } from "firebase/database";
 import SampleCourierService from "./components/SampleCourierService";
 import { CartProvider } from "./contexts/CartContext.jsx";
 import Cart from "./pages/Cart.jsx";
+import CIFRatesAdmin from "./admin/pages/CIFRatesAdmin.jsx";
+import ExchangeRatesAdmin from "./admin/pages/ExchangeRatesAdmin.jsx";
 
 function ScrollToHash() {
   const location = useLocation();
@@ -60,7 +62,6 @@ function ScrollToHash() {
   return null;
 }
 
-// Helper function to check if UID is valid for Firebase
 const isValidFirebaseUid = (uid) => uid && !/[@.#$\[\]]/.test(uid);
 
 export default function App() {
@@ -92,7 +93,7 @@ export default function App() {
 
   const isAdminDashboard = location.pathname.startsWith("/admin");
 
-  // Sync profile with Firebase Realtime Database when auth state changes
+  // Sync profile with localStorage when profile changes
   useEffect(() => {
     console.log("Profile state updated:", {
       hasProfile: !!profile,
@@ -111,7 +112,7 @@ export default function App() {
     }
   }, [profile]);
 
-
+  // Listen for auth state changes
   useEffect(() => {
     let isMounted = true;
     let dbListenerUnsubscribe = null;
@@ -174,7 +175,7 @@ export default function App() {
               setProfile(defaultProfile);
               localStorage.setItem("profile", JSON.stringify(defaultProfile));
             } else {
-              // User authenticated but not in database yet (new registration)
+              // User authenticated but not in database yet
               console.log("User not found in database, creating minimal profile");
               const minimalProfile = {
                 uid: user.uid,
@@ -188,7 +189,7 @@ export default function App() {
             }
           });
         } else {
-          // Invalid UID format, use auth data only
+          // Invalid UID format
           console.log("Invalid UID format, using auth data only");
           const authProfile = {
             uid: user.uid,
@@ -203,7 +204,6 @@ export default function App() {
       }
     });
 
-    // Cleanup function
     return () => {
       isMounted = false;
       unsub();
@@ -213,7 +213,7 @@ export default function App() {
     };
   }, []);
 
-  // Also load profile from localStorage on mount (for quick initial display)
+  // Load profile from localStorage on mount
   useEffect(() => {
     const savedProfile = localStorage.getItem("profile");
     if (savedProfile) {
@@ -224,7 +224,6 @@ export default function App() {
           hasAvatar: !!parsed.avatar
         });
 
-        // If we have a valid UID but no avatar, try to load from Firebase
         if (parsed.uid && isValidFirebaseUid(parsed.uid) && !parsed.avatar) {
           const usersRef = ref(db, "users");
           const quickCheck = onValue(usersRef, (snapshot) => {
@@ -250,23 +249,38 @@ export default function App() {
     }
   }, []);
 
-  // In App.js, update the handleLogout function:
+  // Add cross-tab synchronization
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'profile' && !e.newValue && profile) {
+        console.log('Profile cleared in another tab, updating');
+        setProfile(null);
+      }
+    };
 
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [profile]);
+
+  // Enhanced logout function
   const handleLogout = async () => {
     console.log("Logging out...");
 
     try {
-      // Sign out from Firebase first
+      // Sign out from Firebase
       await auth.signOut();
       console.log("Firebase sign out successful");
     } catch (error) {
       console.error("Firebase sign out error:", error);
     }
 
-    // Clear all state and storage
+    // Clear all state
     setProfile(null);
 
-    // Clear ALL localStorage items to prevent any caching
+    // Clear ALL localStorage items
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -280,8 +294,15 @@ export default function App() {
       console.log("Removed from localStorage:", key);
     });
 
-    // Force immediate state update
-    setProfile(null);
+    // Clear sessionStorage
+    sessionStorage.clear();
+
+    // Clear cookies
+    document.cookie.split(";").forEach(function(c) {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    // Navigate to home
     navigate("/");
 
     // Force full page reload after a short delay
@@ -334,21 +355,22 @@ export default function App() {
                 {isProductsPage ? (
                   <div className="tw-fixed tw-top-0 tw-left-0 tw-right-0 tw-h-[60px] tw-z-50 tw-bg-[#111111]">
                     <NavbarProd
+                      profile={profile}
+                      handleLogout={handleLogout}
                       searchProducts={searchProducts}
                       showProductsPage={() => navigate("/Products-All")}
                       showProfilePanel={openProfilePanel}
                       goHome={goHome}
                       isNavOpen={isNavOpen}
                       toggleNav={setIsNavOpen}
-                      profile={profile}
-                      handleLogout={handleLogout}
                     />
                   </div>
                 ) : (
                   <Navbar
                     profile={profile}
-                    onProfileClick={openProfilePanel}
+                    setProfile={setProfile}
                     handleLogout={handleLogout}
+                    onProfileClick={openProfilePanel}
                   />
                 )}
                 {isProductsPage && (
@@ -419,7 +441,7 @@ export default function App() {
                   path="/admin/*"
                   element={
                     <ProtectedAdminRoute>
-                      <AdminLayout />
+                      <AdminLayout handleLogout={handleLogout} />
                     </ProtectedAdminRoute>
                   }
                 >
@@ -428,6 +450,8 @@ export default function App() {
                   <Route path="users" element={<Users />} />
                   <Route path="products" element={<ProductsAdmin />} />
                   <Route path="market-prices" element={<AdminMarketPrices />} />
+                  <Route path="exchange-rates" element={<ExchangeRatesAdmin/>} />
+                  <Route path="cif-rates" element={<CIFRatesAdmin />} />
                   <Route path="orders" element={<Orders />} />
                   <Route path="services" element={<Services />} />
                   <Route path="pending-quotes" element={<PendingQuotes />} />

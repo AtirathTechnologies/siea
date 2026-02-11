@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useCart } from '../contexts/CartContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -17,10 +17,12 @@ const Cart = () => {
     items: [],
     subtotal: 0,
     itemCount: 0,
-    formattedSubtotal: '₹0'
+    formattedSubtotal: '₹0',
+    totalBags: 0
   });
   const [profile, setProfile] = useState(null);
   const [showThankYou, setShowThankYou] = useState(false);
+  const [localCartItems, setLocalCartItems] = useState([]);
 
   // Load profile from localStorage
   useEffect(() => {
@@ -34,67 +36,111 @@ const Cart = () => {
     }
   }, []);
 
-  // Calculate cart data whenever cart items change - UPDATED TO HANDLE TOTAL PRICE
+  // Initialize local cart items with numberOfBags
+  useEffect(() => {
+    const itemsWithBags = cartItems.map(item => ({
+      ...item,
+      numberOfBags: item.numberOfBags || 1
+    }));
+    setLocalCartItems(itemsWithBags);
+  }, [cartItems]);
+
+  // Calculate cart data whenever local cart items change
   useEffect(() => {
     const calculateCartData = async () => {
-      if (cartItems.length === 0) {
+      if (localCartItems.length === 0) {
         setLiveCartData({
           items: [],
           subtotal: 0,
           itemCount: 0,
-          formattedSubtotal: '₹0'
+          formattedSubtotal: '₹0',
+          totalBags: 0
         });
         return;
       }
 
       setIsLoadingPrices(true);
-      
+
       try {
-        // Separate items that need live prices (items without totalPrice) 
-        // from items that already have totalPrice (like 5kg selections)
-        const itemsWithTotalPrice = cartItems.filter(item => item.totalPrice && !isNaN(item.totalPrice));
-        const itemsWithoutTotalPrice = cartItems.filter(item => !item.totalPrice || isNaN(item.totalPrice));
-        
+        const itemsWithTotalPrice = localCartItems.filter(item => item.totalPrice && !isNaN(item.totalPrice));
+        const itemsWithoutTotalPrice = localCartItems.filter(
+          item =>
+            (!item.totalPrice || isNaN(item.totalPrice)) &&
+            typeof item.grade === 'string'
+        );
+
         let allItems = [];
-        
-        // For items that already have totalPrice (from ProductCard modal), use that directly
+
+        // Process items with totalPrice
         const processedItemsWithTotal = itemsWithTotalPrice.map(item => {
-          const isTotalPriceItem = item.price?.toLowerCase().includes('total:');
+          const isTotalPriceItem = item.isTotalPriceItem ||
+            (typeof item.price === 'string' && item.price.toLowerCase().includes('total:'));
+
+          const numberOfBags = item.numberOfBags || 1;
+          const pricePerBag = item.totalPrice || 0;
+          const subtotal = pricePerBag * numberOfBags;
+
           return {
             ...item,
-            displayPrice: item.totalPrice, // Use the total price directly
-            subtotal: item.totalPrice,
+            displayPrice: pricePerBag,
+            subtotal: subtotal,
             priceUpdated: false,
-            isTotalPriceItem: isTotalPriceItem
+            isTotalPriceItem: isTotalPriceItem,
+            pricePerBag: pricePerBag,
+            // Calculate total price for this item
+            totalPriceForItem: subtotal
           };
         });
-        
-        // For items without totalPrice, fetch live prices if needed
+
+        // Process items without totalPrice
         if (itemsWithoutTotalPrice.length > 0) {
           try {
             const cartWithPrices = await getCartWithLivePrices(itemsWithoutTotalPrice);
-            allItems = [...processedItemsWithTotal, ...cartWithPrices.items];
+
+            const updatedCartWithPrices = cartWithPrices.items.map(item => {
+              const originalItem = itemsWithoutTotalPrice.find(i =>
+                i.id === item.id && i.grade === item.grade
+              );
+              const numberOfBags = originalItem?.numberOfBags || 1;
+              const pricePerBag = item.displayPrice || 0;
+              const subtotal = pricePerBag * numberOfBags;
+
+              return {
+                ...item,
+                numberOfBags: numberOfBags,
+                displayPrice: pricePerBag,
+                subtotal: subtotal,
+                pricePerBag: pricePerBag,
+                // Calculate total price for this item
+                totalPriceForItem: subtotal
+              };
+            });
+
+            allItems = [...processedItemsWithTotal, ...updatedCartWithPrices];
           } catch (error) {
             console.error('Error fetching live prices:', error);
-            // Fallback for items without totalPrice
             const fallbackItems = itemsWithoutTotalPrice.map(item => {
-              let displayPrice = 0;
-              let subtotal = 0;
-              
+              const numberOfBags = item.numberOfBags || 1;
+              let pricePerBag = 0;
+
               if (typeof item.price === 'string') {
                 const priceMatch = item.price.match(/₹\s*([\d,]+\.?\d*)/);
                 if (priceMatch) {
-                  displayPrice = parseFloat(priceMatch[1].replace(/,/g, '')) || 0;
-                  subtotal = displayPrice * (item.quantity || 1);
+                  pricePerBag = parseFloat(priceMatch[1].replace(/,/g, '')) || 0;
                 }
               }
-              
+
+              const subtotal = pricePerBag * (item.quantity || 1) * numberOfBags;
+
               return {
                 ...item,
-                displayPrice,
+                displayPrice: pricePerBag,
                 subtotal,
                 priceUpdated: false,
-                isTotalPriceItem: false
+                isTotalPriceItem: false,
+                pricePerBag: pricePerBag,
+                // Calculate total price for this item
+                totalPriceForItem: subtotal
               };
             });
             allItems = [...processedItemsWithTotal, ...fallbackItems];
@@ -102,15 +148,17 @@ const Cart = () => {
         } else {
           allItems = processedItemsWithTotal;
         }
-        
+
         // Calculate totals
         const subtotal = allItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-        const itemCount = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        
+        const itemCount = allItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.numberOfBags || 1)), 0);
+        const totalBags = allItems.reduce((sum, item) => sum + (item.numberOfBags || 1), 0);
+
         setLiveCartData({
           items: allItems,
           subtotal,
           itemCount,
+          totalBags,
           formattedSubtotal: new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
@@ -118,29 +166,35 @@ const Cart = () => {
             maximumFractionDigits: 2
           }).format(subtotal)
         });
-        
+
       } catch (error) {
         console.error('Error processing cart:', error);
-        // Ultimate fallback
-        const subtotal = cartItems.reduce((sum, item) => {
-          if (item.totalPrice && !isNaN(item.totalPrice)) {
-            return sum + item.totalPrice;
-          }
-          return sum;
+        const subtotal = localCartItems.reduce((sum, item) => {
+          const pricePerBag = item.totalPrice || item.displayPrice || 0;
+          const numberOfBags = item.numberOfBags || 1;
+          return sum + (pricePerBag * numberOfBags);
         }, 0);
-        
-        const itemCount = cartItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        
+
+        const itemCount = localCartItems.reduce((sum, item) =>
+          sum + ((item.quantity || 0) * (item.numberOfBags || 1)), 0);
+
+        const totalBags = localCartItems.reduce((sum, item) => sum + (item.numberOfBags || 1), 0);
+
         setLiveCartData({
-          items: cartItems.map(item => ({
+          items: localCartItems.map(item => ({
             ...item,
-            displayPrice: item.totalPrice || 0,
-            subtotal: item.totalPrice || 0,
+            numberOfBags: item.numberOfBags || 1,
+            displayPrice: item.totalPrice || item.displayPrice || 0,
+            subtotal: (item.totalPrice || item.displayPrice || 0) * (item.numberOfBags || 1),
             priceUpdated: false,
-            isTotalPriceItem: item.totalPrice ? true : false
+            isTotalPriceItem: item.totalPrice ? true : false,
+            pricePerBag: item.totalPrice || item.displayPrice || 0,
+            // Calculate total price for this item
+            totalPriceForItem: (item.totalPrice || item.displayPrice || 0) * (item.numberOfBags || 1)
           })),
           subtotal,
           itemCount,
+          totalBags,
           formattedSubtotal: new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
@@ -154,26 +208,53 @@ const Cart = () => {
     };
 
     calculateCartData();
-  }, [cartItems]);
+  }, [localCartItems]);
+
+  // Function to update number of bags for a specific item
+  const updateNumberOfBags = useCallback((itemId, grade, newNumberOfBags) => {
+    if (newNumberOfBags < 1) newNumberOfBags = 1;
+    if (newNumberOfBags > 100) newNumberOfBags = 100;
+
+    setLocalCartItems(prevItems =>
+      prevItems.map(item => {
+        if (item.id === itemId && item.grade === grade) {
+          return {
+            ...item,
+            numberOfBags: newNumberOfBags
+          };
+        }
+        return item;
+      })
+    );
+  }, []);
 
   // Format price function
-  const formatPrice = (price) => {
-    if (price === undefined || price === null || isNaN(price)) return 'Price on request';
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(price);
-  };
+  const formatPrice = useCallback((price) => {
+  if (price === undefined || price === null || isNaN(price)) return 'Price on request';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(price);
+}, []);
 
   // Custom submit handler for cart orders (passed to BuyModal)
   const handleCartSubmit = async (formData) => {
     setIsSubmitting(true);
-    
+
     try {
+      // Prepare cart items for saving
+      const cartItemsToSave = liveCartData.items.map(item => ({
+        ...item,
+        totalPrice: item.totalPriceForItem || item.subtotal || 0
+      }));
+
+      // Calculate total bags from all items
+      const totalBagsFromItems = liveCartData.totalBags;
+
       // Save cart order to Firebase
-      const result = await saveCartOrder(cartItems, {
+      const result = await saveCartOrder(cartItemsToSave, {
         fullName: formData.fullName || '',
         email: formData.email || '',
         phone: formData.phone || '',
@@ -187,12 +268,14 @@ const Cart = () => {
         port: formData.port || '',
         cif: formData.cif || 'No',
         currency: formData.currency || 'INR',
-        customLogo: formData.customLogo || 'No'
+        customLogo: formData.customLogo || 'No',
+        numberOfBags: totalBagsFromItems || formData.numberOfBags || 1,
+        cartSubtotal: liveCartData.subtotal
       });
 
       console.log('Cart order saved with ID:', result.orderId);
 
-      // Prepare WhatsApp message for cart
+      // Prepare detailed WhatsApp message
       const message = `*🛒 NEW CART ORDER - ${result.orderId}*\n\n` +
         `*Customer Information:*\n` +
         `👤 Name: ${formData.fullName}\n` +
@@ -203,22 +286,32 @@ const Cart = () => {
         `*Order Details:*\n` +
         `📦 Order Type: Shopping Cart\n` +
         `📊 Total Items: ${liveCartData.itemCount}\n` +
-        `💰 Cart Total: ${liveCartData.formattedSubtotal}\n` +
+        `🛍️ Total Bags: ${totalBagsFromItems}\n` +
+        `💰 Cart Subtotal: ${liveCartData.formattedSubtotal}\n` +
         `📦 Packing: ${formData.packing || 'Not specified'}\n` +
         (formData.state ? `🏙️ State: ${formData.state}\n` : '') +
         (formData.port ? `⚓ Port: ${formData.port}\n` : '') +
         (formData.cif ? `📦 CIF: ${formData.cif}\n` : '') +
         (formData.currency ? `💰 Currency: ${formData.currency}\n` : '') +
         (formData.customLogo ? `🏷️ Custom Logo: ${formData.customLogo}\n` : '') +
-        `\n*Cart Items (${cartItems.length} items):*\n` +
-        cartItems.map((item, index) => {
+        // In the WhatsApp message in handleCartSubmit function, update the cart items section:
+        `\n*Cart Items Details:*\n` +
+        liveCartData.items.map((item, index) => {
+          const numberOfBags = item.numberOfBags || 1;
+          const pricePerBag = item.pricePerBag || item.totalPrice || item.displayPrice || 0;
+          const totalForItem = item.totalPriceForItem || item.subtotal || 0;
+
           return `${index + 1}. ${item.name}\n` +
             `   • Grade: ${item.grade || 'Not specified'}\n` +
-            `   • Quantity: ${item.quantityUnit || '1 unit'}\n` +
-            `   • Price: ${item.price || 'Price on request'}\n`;
+            `   • Quantity per bag: ${item.quantityUnit || '1 unit'}\n` +
+            `   • Price per bag: ₹${pricePerBag.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+            `   • Number of bags: ${numberOfBags}\n` +
+            `   • Subtotal: ₹${(pricePerBag * numberOfBags).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+            `   • Total for item: ₹${totalForItem.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
         }).join('\n') +
         `\n*Order Summary:*\n` +
         `📦 Total Items: ${liveCartData.itemCount}\n` +
+        `🛍️ Total Bags: ${totalBagsFromItems}\n` +
         `💰 Cart Subtotal: ${liveCartData.formattedSubtotal}\n` +
         `📦 Additional Packing: ${formData.packing || 'Not specified'}\n` +
         (formData.cif === 'Yes' ? `📦 Insurance: ₹${(formData.insurancePrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : '') +
@@ -232,16 +325,17 @@ const Cart = () => {
       // Send WhatsApp message
       const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '919999999999';
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank');
-      
+
       // Show thank you popup
       setShowThankYou(true);
-      
+
       // Clear cart after successful submission
       clearCart();
-      
+      setLocalCartItems([]);
+
       // Close BuyModal
       setShowBuyModal(false);
-      
+
     } catch (error) {
       console.error('Cart order submission error:', error);
       alert('❌ Failed to place order. Please try again or contact support.');
@@ -249,6 +343,14 @@ const Cart = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Handle item removal
+  const handleRemoveItem = useCallback((itemId) => {
+    if (window.confirm('Are you sure you want to remove this item?')) {
+      removeFromCart(itemId);
+      setLocalCartItems(prev => prev.filter(i => i.id !== itemId));
+    }
+  }, [removeFromCart]);
 
   // Special product object for cart
   const cartProduct = {
@@ -305,7 +407,10 @@ const Cart = () => {
               Continue Shopping
             </button>
             <button
-              onClick={clearCart}
+              onClick={() => {
+                clearCart();
+                setLocalCartItems([]);
+              }}
               className="tw-bg-red-500/20 tw-text-red-400 tw-border tw-border-red-500 tw-px-5 tw-py-2.5 tw-rounded-lg hover:tw-bg-red-500/30 tw-transition"
             >
               Clear Cart
@@ -334,17 +439,22 @@ const Cart = () => {
                 </div>
                 <div className="tw-space-y-6">
                   {liveCartData.items.map((item, index) => {
-                    const isTotalPriceItem = item.isTotalPriceItem || item.price?.toLowerCase().includes('total:');
-                    
+                    const isTotalPriceItem = item.isTotalPriceItem ||
+                      (typeof item.price === 'string' && item.price.toLowerCase().includes('total:'));
+
+                    const numberOfBags = item.numberOfBags || 1;
+                    const pricePerBag = item.pricePerBag || item.totalPrice || item.displayPrice || 0;
+                    const totalForItem = item.totalPriceForItem || item.subtotal || 0;
+
                     return (
-                      <div 
-                        key={`${item.id}-${item.grade || 'nograde'}-${item.packing || 'nopacking'}-${index}`} 
+                      <div
+                        key={`${item.id}-${item.grade || 'nograde'}-${item.packing || 'nopacking'}-${index}`}
                         className="tw-flex tw-flex-col sm:tw-flex-row tw-gap-4 tw-p-4 tw-bg-black/30 tw-rounded-xl tw-border tw-border-yellow-400/20"
                       >
                         {/* Product Image */}
                         <div className="tw-flex-shrink-0">
-                          <img 
-                            src={item.image} 
+                          <img
+                            src={item.image}
                             alt={item.name}
                             className="tw-w-24 tw-h-24 sm:tw-w-32 sm:tw-h-32 tw-object-cover tw-rounded-lg"
                             onError={(e) => {
@@ -352,7 +462,7 @@ const Cart = () => {
                             }}
                           />
                         </div>
-                        
+
                         {/* Product Details */}
                         <div className="tw-flex-grow">
                           <div className="tw-flex tw-flex-col sm:tw-flex-row sm:tw-justify-between">
@@ -369,7 +479,10 @@ const Cart = () => {
                                 </p>
                               )}
                               <p className="tw-text-sm tw-text-yellow-200/80 tw-mb-1">
-                                Quantity: {item.quantityUnit || '1 unit'}
+                                Quantity per bag: {item.quantityUnit || '1 unit'}
+                              </p>
+                              <p className="tw-text-sm tw-text-yellow-200/80 tw-mb-1">
+                                Price per bag: {formatPrice(pricePerBag)}
                               </p>
                               {item.hsn && (
                                 <p className="tw-text-xs tw-text-yellow-200/60">
@@ -377,15 +490,17 @@ const Cart = () => {
                                 </p>
                               )}
                             </div>
-                            
+
                             <div className="tw-text-right">
                               <div className="tw-flex tw-flex-col tw-items-end">
                                 <p className="tw-text-lg tw-font-bold tw-text-yellow-400">
-                                  {formatPrice(item.subtotal)}
+                                  {formatPrice(totalForItem)}
                                 </p>
-                                <p className="tw-text-sm tw-text-yellow-200/60">
-                                  {isTotalPriceItem ? 'Total amount' : `Price per unit: ${formatPrice(item.displayPrice)}`}
-                                </p>
+                                {/* <p className="tw-text-sm tw-text-yellow-200/60">
+                                  {numberOfBags > 1 ?
+                                    `${numberOfBags} bags × ${formatPrice(pricePerBag)}`
+                                    : `Price per bag: ${formatPrice(pricePerBag)}`}
+                                </p> */}
                                 {item.priceUpdated && (
                                   <span className="tw-text-xs tw-text-green-400 tw-bg-green-900/30 tw-px-2 tw-py-0.5 tw-rounded tw-mt-1">
                                     Price Updated
@@ -394,52 +509,76 @@ const Cart = () => {
                               </div>
                             </div>
                           </div>
-                          
-                          {/* Quantity Controls - Special handling for total price items */}
-                          <div className="tw-flex tw-items-center tw-justify-between tw-mt-4">
-                            <div className="tw-flex tw-items-center tw-space-x-4">
-                              {isTotalPriceItem ? (
-                                // For total price items, show static quantity
+
+                          {/* Quantity Controls and Number of Bags Controls */}
+                          <div className="tw-flex tw-flex-col sm:tw-flex-row sm:tw-items-center tw-justify-between tw-mt-4 tw-gap-4">
+                            <div className="tw-flex tw-flex-col sm:tw-flex-row tw-items-start sm:tw-items-center tw-gap-4">
+                              {/* Regular Quantity Controls (if applicable) */}
+                              {!isTotalPriceItem && item.quantity !== undefined && (
                                 <div className="tw-flex tw-items-center tw-space-x-3 tw-bg-black/50 tw-p-2 tw-rounded-lg">
-                                  <span className="tw-text-lg tw-font-semibold tw-text-yellow-300 tw-px-2">
-                                     {item.quantityUnit || 'unit'}
-                                  </span>
+                                  <div className="tw-flex tw-flex-col">
+                                    <span className="tw-text-xs tw-text-yellow-200/60 tw-mb-1">Units per bag</span>
+                                    <div className="tw-flex tw-items-center tw-space-x-3">
+                                      <button
+                                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                        className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400/20 tw-text-yellow-400 tw-rounded-lg hover:tw-bg-yellow-400/30 tw-transition disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
+                                        disabled={item.quantity <= 1}
+                                      >
+                                        -
+                                      </button>
+                                      <span className="tw-text-lg tw-font-semibold tw-text-yellow-300 tw-w-8 tw-text-center">
+                                        {item.quantity}
+                                      </span>
+                                      <button
+                                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                        className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400/20 tw-text-yellow-400 tw-rounded-lg hover:tw-bg-yellow-400/30 tw-transition"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
-                              ) : (
-                                // For regular items, show quantity controls
-                                <>
-                                  <div className="tw-flex tw-items-center tw-space-x-3 tw-bg-black/50 tw-p-2 tw-rounded-lg">
+                              )}
+
+                              {/* Number of Bags Controls */}
+                              <div className="tw-flex tw-items-center tw-space-x-3 tw-bg-black/50 tw-p-2 tw-rounded-lg">
+                                <div className="tw-flex tw-flex-col">
+                                  {/* <span className="tw-text-xs tw-text-yellow-200/60 tw-mb-1">Number of Bags</span> */}
+                                  <div className="tw-flex tw-items-center tw-space-x-3">
                                     <button
-                                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                      onClick={() => updateNumberOfBags(item.id, item.grade, numberOfBags - 1)}
                                       className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400/20 tw-text-yellow-400 tw-rounded-lg hover:tw-bg-yellow-400/30 tw-transition disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
-                                      disabled={item.quantity <= 1}
+                                      disabled={numberOfBags <= 1}
                                     >
                                       -
                                     </button>
                                     <span className="tw-text-lg tw-font-semibold tw-text-yellow-300 tw-w-8 tw-text-center">
-                                      {item.quantity}
+                                      {numberOfBags}
                                     </span>
                                     <button
-                                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                      onClick={() => updateNumberOfBags(item.id, item.grade, numberOfBags + 1)}
                                       className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400/20 tw-text-yellow-400 tw-rounded-lg hover:tw-bg-yellow-400/30 tw-transition"
+                                      disabled={numberOfBags >= 100}
                                     >
                                       +
                                     </button>
                                   </div>
-                                  <span className="tw-text-sm tw-text-yellow-200/60">
-                                    {item.quantity} unit{item.quantity > 1 ? 's' : ''}
-                                  </span>
-                                </>
-                              )}
+                                </div>
+                              </div>
+
+                              {/* Summary */}
+                              {/* <div className="tw-text-sm tw-text-yellow-200/60">
+                                {!isTotalPriceItem && item.quantity !== undefined && (
+                                  <p>{item.quantity} unit{item.quantity > 1 ? 's' : ''} per bag</p>
+                                )}
+                                <p>{numberOfBags} bag{numberOfBags > 1 ? 's' : ''} total</p>
+                                <p>Total: {formatPrice(totalForItem)}</p>
+                              </div> */}
                             </div>
-                            
+
                             <button
-                              onClick={() => {
-                                if (window.confirm('Are you sure you want to remove this item?')) {
-                                  removeFromCart(item.id);
-                                }
-                              }}
-                              className="tw-text-red-400 hover:tw-text-red-300 tw-transition tw-flex tw-items-center tw-gap-2"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="tw-text-red-400 hover:tw-text-red-300 tw-transition tw-flex tw-items-center tw-gap-2 tw-self-end sm:tw-self-auto"
                             >
                               <svg className="tw-w-5 tw-h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -462,7 +601,7 @@ const Cart = () => {
               <h2 className="tw-text-xl tw-font-bold tw-text-yellow-400 tw-mb-6">
                 Order Summary
               </h2>
-              
+
               <div className="tw-space-y-4">
                 <div className="tw-flex tw-justify-between tw-items-center">
                   <span className="tw-text-yellow-200">Items ({liveCartData.itemCount})</span>
@@ -470,21 +609,28 @@ const Cart = () => {
                     {liveCartData.formattedSubtotal}
                   </span>
                 </div>
-                
+
+                <div className="tw-flex tw-justify-between tw-items-center">
+                  <span className="tw-text-yellow-200">Total Bags</span>
+                  <span className="tw-text-yellow-300 tw-font-semibold">
+                    {liveCartData.totalBags}
+                  </span>
+                </div>
+
                 <div className="tw-flex tw-justify-between tw-items-center">
                   <span className="tw-text-yellow-200">Shipping</span>
                   <span className="tw-text-yellow-300 tw-text-sm">
                     Calculated at checkout
                   </span>
                 </div>
-                
+
                 <div className="tw-flex tw-justify-between tw-items-center tw-border-t tw-border-yellow-400/30 tw-pt-4 tw-mt-4">
                   <span className="tw-text-lg tw-font-bold tw-text-yellow-400">Total Amount</span>
                   <span className="tw-text-2xl tw-font-bold tw-text-yellow-400">
                     {liveCartData.formattedSubtotal}
                   </span>
                 </div>
-                
+
                 {isLoadingPrices && (
                   <div className="tw-bg-yellow-900/20 tw-border tw-border-yellow-500/30 tw-rounded-lg tw-p-3 tw-mt-4">
                     <div className="tw-flex tw-items-center tw-gap-2 tw-text-yellow-400 tw-text-sm">
@@ -496,16 +642,19 @@ const Cart = () => {
                     </div>
                   </div>
                 )}
-                
+
                 <button
                   onClick={() => setShowBuyModal(true)}
                   className="tw-w-full tw-bg-gradient-to-r tw-from-yellow-500 tw-to-yellow-600 tw-text-black tw-font-bold tw-py-3.5 tw-px-4 tw-rounded-xl tw-mt-6 hover:tw-from-yellow-600 hover:tw-to-yellow-700 tw-transition tw-shadow-lg disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
-                  disabled={cartItems.length === 0 || isLoadingPrices}
+                  disabled={localCartItems.length === 0 || isLoadingPrices}
                 >
                   {isLoadingPrices ? 'Updating Prices...' : 'Proceed to Checkout'}
                 </button>
-                
+
                 <div className="tw-mt-6 tw-text-sm tw-text-yellow-200/60 tw-space-y-2">
+                  <p className="tw-flex tw-items-center tw-gap-2">
+                    <span className="tw-text-green-400">✓</span> Adjust number of bags per product
+                  </p>
                   <p className="tw-flex tw-items-center tw-gap-2">
                     <span className="tw-text-green-400">✓</span> Live Price Updates
                   </p>
@@ -525,25 +674,25 @@ const Cart = () => {
         </div>
       </div>
 
-      {/* BuyModal - Now supports cart orders */}
+      {/* BuyModal - Pass the calculated cart data with updated prices */}
       <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
         product={cartProduct}
         profile={profile}
         isCartOrder={true}
-        cartItems={cartItems}
-        cartTotal={liveCartData.subtotal}
+        cartItems={liveCartData.items} // Pass the calculated items with updated prices
+        cartTotal={liveCartData.subtotal} // Pass the calculated subtotal
         onSubmitCartOrder={handleCartSubmit}
       />
 
       {/* Thank You Popup for cart orders */}
-      <ThankYouPopup 
-        isOpen={showThankYou} 
+      <ThankYouPopup
+        isOpen={showThankYou}
         onClose={() => {
           setShowThankYou(false);
           navigate('/');
-        }} 
+        }}
       />
     </div>
   );

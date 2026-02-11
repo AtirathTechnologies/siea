@@ -1,7 +1,7 @@
-// src/admin/AdminLayout.jsx
 import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
+import { auth } from "../firebase";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -48,14 +48,85 @@ export default function AdminLayout() {
     };
   }, []);
 
+  // Function to clear Firebase persistence
+  const clearFirebasePersistence = async () => {
+    try {
+      // Clear Firebase IndexedDB databases
+      if (window.indexedDB && window.indexedDB.databases) {
+        const databases = await window.indexedDB.databases();
+        for (const dbInfo of databases) {
+          if (dbInfo.name && (
+            dbInfo.name.includes('firebase') || 
+            dbInfo.name.includes('Firebase') ||
+            dbInfo.name.includes('firestore') ||
+            dbInfo.name.includes('auth')
+          )) {
+            window.indexedDB.deleteDatabase(dbInfo.name);
+          }
+        }
+      }
+      
+      // Clear localStorage items with firebase prefix
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Clear sessionStorage items with firebase prefix
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } catch (error) {
+      console.error("Error clearing Firebase persistence:", error);
+    }
+  };
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAdmin");
-    localStorage.removeItem("profile");
-    localStorage.removeItem("user");
-    sessionStorage.clear();
-    navigate("/", { replace: true });
-    window.location.reload();
+  // COMPLETE LOGOUT FUNCTION - Same as ProfilePanel
+  const handleLogout = async () => {
+    try {
+      // First sign out from Firebase
+      await auth.signOut();
+      
+      // Clear Firebase persistence storage (IndexedDB, localStorage, etc.)
+      await clearFirebasePersistence();
+      
+      // Clear ALL localStorage items
+      localStorage.clear();
+      
+      // Clear ALL sessionStorage items
+      sessionStorage.clear();
+      
+      // Clear cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      console.log("Admin signed out and all data cleared successfully");
+      
+      // Navigate to home
+      navigate("/", { replace: true });
+      
+      // Force hard redirect with page reload to clear all state
+      setTimeout(() => {
+        window.location.href = "/";
+        window.location.reload();
+      }, 100);
+      
+    } catch (error) {
+      console.error("Admin logout error:", error);
+      // Still clear everything and redirect even if Firebase signout fails
+      await clearFirebasePersistence();
+      localStorage.clear();
+      sessionStorage.clear();
+      navigate("/", { replace: true });
+      window.location.href = "/";
+      window.location.reload();
+    }
   };
 
   return (
@@ -131,6 +202,6 @@ export default function AdminLayout() {
           </div>
         </div>
       </div>
-    </div >
+    </div>
   );
 }

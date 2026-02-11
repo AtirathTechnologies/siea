@@ -16,32 +16,43 @@ export default function Login({ setProfile }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  // Default admin credentials
-  const defaultAdmins = [
-    {
-      email: 'admin1@company.com',
-      password: 'admin123',
-      uid: 'default-admin-1',
-      displayName: 'Admin One',
-      isAdmin: true,
-      isDefaultAdmin: true
-    },
-    {
-      email: 'admin2@company.com',
-      password: 'admin456',
-      uid: 'default-admin-2',
-      displayName: 'Admin Two',
-      isAdmin: true,
-      isDefaultAdmin: true
+  // Function to fetch admin users from Firebase
+  const fetchAdminUsers = async () => {
+    try {
+      const adminsRef = ref(db, "admins");
+      const snapshot = await get(adminsRef);
+      
+      if (snapshot.exists()) {
+        const adminsData = snapshot.val();
+        // Convert object to array of admin users
+        const adminUsers = Object.entries(adminsData).map(([uid, adminData]) => ({
+          uid,
+          ...adminData
+        }));
+        return adminUsers;
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching admin users:", error);
+      return [];
     }
-  ];
+  };
 
-  // Helper function to create safe Firebase paths
-  const createSafeUid = (email) => {
-    return email
-      .replace(/@/g, '-at-')
-      .replace(/\./g, '-dot-')
-      .replace(/[#.$\[\]]/g, '-');
+  // Function to fetch regular users from Firebase
+  const fetchRegularUsers = async () => {
+    try {
+      const usersRef = ref(db, "users");
+      const snapshot = await get(usersRef);
+      
+      if (snapshot.exists()) {
+        const usersData = snapshot.val();
+        return usersData;
+      }
+      return {};
+    } catch (error) {
+      console.error("Error fetching regular users:", error);
+      return {};
+    }
   };
 
   const handleChange = (e) => {
@@ -73,91 +84,79 @@ export default function Login({ setProfile }) {
     }
 
     try {
-      // Check if it's a default admin first
-      const defaultAdmin = defaultAdmins.find(admin =>
-        admin.email === email && admin.password === password
-      );
-
-      if (defaultAdmin) {
-        // Handle default admin login
-        console.log("Default admin login detected:", email);
-
-        const adminProfile = {
-          uid: defaultAdmin.uid,
-          email: defaultAdmin.email,
-          name: defaultAdmin.displayName,
-          displayName: defaultAdmin.displayName,
-          isAdmin: true,
-          isDefaultAdmin: true,
-          phone: "",
-          avatar: ""
-        };
-
-        setProfile(adminProfile);
-        localStorage.setItem("profile", JSON.stringify(adminProfile));
-        localStorage.setItem("isAdmin", "true");
-
-        if (rememberMe) {
-          localStorage.setItem("rememberMe", "true");
-          localStorage.setItem("userEmail", email);
-        } else {
-          localStorage.removeItem("rememberMe");
-          localStorage.removeItem("userEmail");
-        }
-
-        // Redirect to admin dashboard
-        navigate("/admin/dashboard");
-        return;
-      }
-
-      // Handle Firebase user login (existing code)
+      // First, try Firebase authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Check if this Firebase user is an admin
+      // Check if this user is an admin in Firebase
       const adminRef = ref(db, "admins/" + user.uid);
       const adminSnapshot = await get(adminRef);
       const isFirebaseAdmin = adminSnapshot.exists();
 
-      const usersRef = ref(db, "users");
+      // Also fetch all admins to check email-based admin status (for reference)
+      const allAdmins = await fetchAdminUsers();
+      
+      // Check if this email exists in admin list (even if Firebase UID doesn't match)
+      const emailBasedAdmin = allAdmins.find(admin => 
+        admin.email && admin.email.toLowerCase() === email.toLowerCase()
+      );
 
+      // Check if user exists in regular users database
+      const usersRef = ref(db, "users");
       const snapshot = await get(usersRef);
 
       let matchedUser = null;
-      snapshot.forEach(child => {
-        if (child.val().uid === user.uid) {
-          matchedUser = { id: child.key, ...child.val() };
-        }
-      });
+      if (snapshot.exists()) {
+        const usersData = snapshot.val();
+        // Find user by email in users database
+        Object.entries(usersData).forEach(([key, userData]) => {
+          if (userData.email && userData.email.toLowerCase() === email.toLowerCase()) {
+            matchedUser = { id: key, ...userData };
+          }
+        });
+      }
 
       let profileData;
 
-      if (snapshot.exists()) {
-        const userData = snapshot.val();
+      if (matchedUser) {
+        // User found in users database
         profileData = {
           uid: user.uid,
-          name: userData.fullName || user.displayName || "User",
-          email: userData.email || user.email,
-          phone: userData.phone || "",
-          avatar: user.photoURL || "https://randomuser.me/api/portraits/men/32.jpg",
-          isAdmin: isFirebaseAdmin
+          name: matchedUser.fullName || user.displayName || "User",
+          email: matchedUser.email || user.email,
+          phone: matchedUser.phone || "",
+          avatar: matchedUser.avatar || user.photoURL || "https://randomuser.me/api/portraits/men/32.jpg",
+          isAdmin: isFirebaseAdmin || !!emailBasedAdmin,
+          // Store additional admin info if available
+          adminInfo: emailBasedAdmin || null
         };
       } else {
+        // User not in users database, create basic profile
         profileData = {
           uid: user.uid,
           name: user.displayName || "User",
           email: user.email,
           phone: "",
           avatar: user.photoURL || "https://randomuser.me/api/portraits/men/32.jpg",
-          isAdmin: isFirebaseAdmin
+          isAdmin: isFirebaseAdmin || !!emailBasedAdmin,
+          adminInfo: emailBasedAdmin || null
         };
+      }
+
+      // If user is an admin via email but not via Firebase UID, we should add them to Firebase admins
+      if (emailBasedAdmin && !isFirebaseAdmin) {
+        console.log("User is admin by email but not in Firebase admins node");
+        // You might want to add a function here to sync admin status to Firebase
+        // This ensures consistency between email-based and UID-based admin checks
       }
 
       setProfile(profileData);
       localStorage.setItem("profile", JSON.stringify(profileData));
 
-      if (isFirebaseAdmin) {
+      if (profileData.isAdmin) {
         localStorage.setItem("isAdmin", "true");
+      } else {
+        localStorage.removeItem("isAdmin");
       }
 
       if (rememberMe) {
@@ -169,7 +168,7 @@ export default function Login({ setProfile }) {
       }
 
       // Redirect based on user type
-      if (isFirebaseAdmin) {
+      if (profileData.isAdmin) {
         navigate("/admin/dashboard");
       } else {
         navigate("/");
@@ -188,15 +187,6 @@ export default function Login({ setProfile }) {
     }
   };
 
-  // Quick login buttons for testing (optional - remove in production)
-  const quickAdminLogin = (adminNumber) => {
-    const admin = defaultAdmins[adminNumber - 1];
-    setFormData({
-      email: admin.email,
-      password: admin.password
-    });
-  };
-
   useEffect(() => {
     const remembered = localStorage.getItem("rememberMe");
     const rememberedEmail = localStorage.getItem("userEmail");
@@ -212,51 +202,6 @@ export default function Login({ setProfile }) {
       <div className="login-form-box">
         <img src={logo} alt={t("logo_alt_text")} className="login-logo" />
         <h1 className="login-title">{t("login")}</h1>
-
-        {/* Quick Admin Login Buttons (for testing - remove in production) */}
-        <div className="quick-admin-buttons" style={{
-          marginBottom: '20px',
-          textAlign: 'center',
-          padding: '10px',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          borderRadius: '8px'
-        }}>
-          <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
-            Quick Admin Login (Testing)
-          </p>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            <button
-              type="button"
-              onClick={() => quickAdminLogin(1)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                border: '1px solid #3b82f6',
-                borderRadius: '6px',
-                color: '#3b82f6',
-                fontSize: '12px',
-                cursor: 'pointer'
-              }}
-            >
-              Admin 1
-            </button>
-            <button
-              type="button"
-              onClick={() => quickAdminLogin(2)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                border: '1px solid #3b82f6',
-                borderRadius: '6px',
-                color: '#3b82f6',
-                fontSize: '12px',
-                cursor: 'pointer'
-              }}
-            >
-              Admin 2
-            </button>
-          </div>
-        </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="input-group">

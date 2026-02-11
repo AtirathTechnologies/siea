@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext.jsx';
 import Logo from '../assets/logo.png';
 
-const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profile }) => {
+const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profile, handleLogout }) => {
   const { t } = useLanguage();
   const [isNavOpen, setIsNavOpen] = useState(false);
   const menuRef = useRef(null);
@@ -107,6 +107,17 @@ const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profil
     return name ? name.charAt(0).toUpperCase() : "?";
   };
 
+  const handleLocalLogout = () => {
+    if (isNavOpen) {
+      setIsNavOpen(false);
+      document.body.style.overflow = 'auto';
+    }
+    
+    if (handleLogout) {
+      handleLogout();
+    }
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-logo-title" onClick={handleGoHome}>
@@ -175,7 +186,7 @@ const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profil
           <span>{t('ocean_freight')}</span>
         </button>
 
-        {/* Add this cart button in the desktop section */}
+        {/* Cart button */}
         <button
           onClick={() => navigate('/cart')}
           className="tw-relative tw-bg-transparent tw-border tw-border-yellow-400 tw-text-yellow-400 tw-p-2 tw-rounded-lg tw-flex tw-items-center tw-justify-center tw-w-10 tw-h-10 hover:tw-bg-yellow-400/20 tw-transition"
@@ -203,35 +214,66 @@ const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profil
           )}
         </button>
 
-        <button
-          className="tw-flex tw-items-center tw-gap-3 tw-px-4 tw-py-2 tw-rounded-lg tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-transition tw-duration-200 tw-font-medium tw-text-white"
-          onClick={showProfilePanel}
-        >
-          <div className="tw-w-6 tw-h-6 tw-rounded-full tw-overflow-hidden tw-shadow-md tw-ring-2 tw-ring-yellow-500">
-            {profile?.avatar ? (
-              <img
-                src={profile.avatar}
-                alt="Profile"
-                className="tw-w-full tw-h-full tw-object-cover"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                  e.target.parentNode.style.background = "linear-gradient(to bottom right, #22c55e, #3b82f6)";
-                  e.target.parentNode.innerHTML += `<span class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full tw-text-white tw-font-bold tw-text-sm">${getAvatarInitial()}</span>`;
-                }}
-              />
-            ) : (
-              <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-sm tw-font-bold">
-                {getAvatarInitial()}
+        {/* ALWAYS SHOW LOGIN/REGISTER when profile is null, otherwise show profile */}
+        {profile ? (
+          <>
+            <button
+              className="tw-flex tw-items-center tw-gap-3 tw-px-4 tw-py-2 tw-rounded-lg tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-transition tw-duration-200 tw-font-medium tw-text-white"
+              onClick={showProfilePanel}
+            >
+              <div className="tw-w-6 tw-h-6 tw-rounded-full tw-overflow-hidden tw-shadow-md tw-ring-2 tw-ring-yellow-500">
+                {profile?.avatar ? (
+                  <img
+                    src={profile.avatar}
+                    alt="Profile"
+                    className="tw-w-full tw-h-full tw-object-cover"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.parentNode.style.background = "linear-gradient(to bottom right, #22c55e, #3b82f6)";
+                      e.target.parentNode.innerHTML = `<span class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full tw-text-white tw-font-bold tw-text-sm">${getAvatarInitial()}</span>`;
+                    }}
+                  />
+                ) : (
+                  <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-sm tw-font-bold">
+                    {getAvatarInitial()}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-
-          {/* Dropdown Arrow */}
-          <svg className="tw-w-4 tw-h-4 tw-text-yellow-400 tw-hidden sm:tw-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+              <svg className="tw-w-4 tw-h-4 tw-text-yellow-400 tw-hidden sm:tw-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className="nav-btn"
+              onClick={() => {
+                if (isNavOpen) {
+                  setIsNavOpen(false);
+                  document.body.style.overflow = 'auto';
+                }
+                navigate('/login');
+              }}
+            >
+              <span>{t('login')}</span>
+            </button>
+            
+            <button
+              className="nav-btn tw-bg-yellow-400 tw-text-black hover:tw-bg-yellow-300"
+              onClick={() => {
+                if (isNavOpen) {
+                  setIsNavOpen(false);
+                  document.body.style.overflow = 'auto';
+                }
+                navigate('/register');
+              }}
+            >
+              <span>{t('register')}</span>
+            </button>
+          </>
+        )}
       </div>
     </nav>
   );

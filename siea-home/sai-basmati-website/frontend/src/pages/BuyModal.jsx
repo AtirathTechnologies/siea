@@ -44,6 +44,9 @@ const BuyModal = ({
   const [addressCountry, setAddressCountry] = useState("");
   const [pincode, setPincode] = useState("");
 
+  // NEW: Number of bags state
+  const [numberOfBags, setNumberOfBags] = useState(1);
+
   const [grades, setGrades] = useState([]);
   const [liveGradePricePerKg, setLiveGradePricePerKg] = useState(0);
 
@@ -234,24 +237,30 @@ const BuyModal = ({
       setTransportTotal(transportTotalINR * exchangeRate);
       setTotalPrice(totalINR * exchangeRate);
     } else {
-      // Original logic for single products
+      // Original logic for single products - UPDATED with numberOfBags
       const basePricePerQtlINR = liveGradePricePerKg * 100;
 
       let qtyInKg = quantity === "1ton" ? 1000 : parseFloat(quantity.replace("kg", "")) || 0;
       const qtyInQuintals = qtyInKg / 100;
-      const qPriceINR = basePricePerQtlINR * qtyInQuintals;
+      const qPriceINR = basePricePerQtlINR * qtyInQuintals * numberOfBags; // Multiply by number of bags
 
-      const pPriceINR = packing ? packingPriceMap[packing] || 0 : 0;
-      const lPriceINR = customLogo === "Yes" ? 879.80 : 0;
+      // UPDATED: Multiply packing price by number of bags
+      const pPriceINR = packing ? (packingPriceMap[packing] || 0) * numberOfBags : 0;
+      const lPriceINR = customLogo === "Yes" ? 879.80 * numberOfBags : 0; // Also multiply logo price if per bag
       const iPriceINR = cif === "Yes" ? qPriceINR * 0.01 : 0;
-      const fPriceINR = cif === "Yes" && port ? (freightPriceMap[port] || 0) * (qtyInKg / 1000) : 0;
+
+      // UPDATED: Freight calculation based on total weight (bags × quantity per bag)
+      const totalWeightInTons = (qtyInKg * numberOfBags) / 1000;
+      const fPriceINR = cif === "Yes" && port ? (freightPriceMap[port] || 0) * totalWeightInTons : 0;
 
       let transportPerQtlINR = 0;
       if (state && port && cif === "Yes") {
         const displayPort = portDisplayMap[port];
         transportPerQtlINR = getTransportPrice(state, displayPort) || 0;
       }
-      const transportTotalINR = transportPerQtlINR * qtyInQuintals;
+      // UPDATED: Transport total based on total quintals
+      const totalQuintals = qtyInQuintals * numberOfBags;
+      const transportTotalINR = transportPerQtlINR * totalQuintals;
 
       const totalINR = qPriceINR + pPriceINR + lPriceINR + iPriceINR + fPriceINR + transportTotalINR;
 
@@ -266,7 +275,7 @@ const BuyModal = ({
       setTotalPrice(totalINR * exchangeRate);
     }
   }, [
-    liveGradePricePerKg, cif, grade, packing, quantity, port, state, currency, customLogo, product, t, isCartOrder, cartTotal
+    liveGradePricePerKg, cif, grade, packing, quantity, port, state, currency, customLogo, product, t, isCartOrder, cartTotal, numberOfBags
   ]);
 
   const validatePhoneNumber = (num, code) => {
@@ -384,7 +393,9 @@ const BuyModal = ({
         ` - ${t("variety")}: ${product?.name?.en || "N/A"}\n` +
         ` - ${t("grade")}: ${grade}\n` +
         ` - ${t("packing")}: ${t(packing.toLowerCase().replace(/\s/g, "_"))}\n` +
-        ` - ${t("quantity")}: ${quantity}\n` +
+        ` - ${t("quantity_per_bag")}: ${quantity}\n` +
+        ` - ${t("number_of_bags")}: ${numberOfBags}\n` +
+        ` - ${t("total_quantity")}: ${quantity === "1ton" ? `${numberOfBags} ton` : `${parseFloat(quantity.replace("kg", "")) * numberOfBags} kg`}\n` +
         ` - ${t("state")}: ${state}\n` +
         ` - ${t("port")}: ${t(port.toLowerCase().replace(/\s/g, "_"))}\n` +
         ` - ${t("cif")}: ${cif === "Yes" ? t("yes") : t("no")}\n` +
@@ -399,7 +410,7 @@ const BuyModal = ({
       message += ` - ${t("grade_price")}: ${sym}${gradePrice.toFixed(2)} ${t("per")} ${t("quintal")}\n`;
     }
 
-    message += ` - ${t("packing_price")}: ${sym}${packingPrice.toFixed(2)} ${t("per")} ${t("bag")}\n` +
+    message += ` - ${t("packing_price")}: ${sym}${packingPrice.toFixed(2)} (${isCartOrder ? 'estimated' : numberOfBags + ' ' + t('bags')})\n` +
       ` - ${t("quantity_price")}: ${sym}${quantityPrice.toFixed(2)}\n`;
 
     if (cif === "Yes") {
@@ -423,6 +434,10 @@ const BuyModal = ({
       grade: isCartOrder ? 'Multiple Grades' : grade,
       packing,
       quantity: isCartOrder ? `${cartItems.length} items` : quantity,
+      numberOfBags: isCartOrder ? null : numberOfBags,
+      totalQuantity: isCartOrder ? null : (quantity === "1ton" ?
+        `${numberOfBags} ton` :
+        `${parseFloat(quantity.replace("kg", "")) * numberOfBags} kg`),
       state,
       port,
       cif,
@@ -460,18 +475,37 @@ const BuyModal = ({
   };
 
   const handleClose = () => {
-    setGrade(""); setPacking(""); setQuantity(""); setPort(""); setState(""); setCif(""); setCurrency("USD");
-    setCustomLogo(""); setAdditionalInfo(""); setFullName(""); setEmail(""); setPhoneNumber("");
+    setGrade("");
+    setPacking("");
+    setQuantity("");
+    setPort("");
+    setState("");
+    setCif("");
+    setCurrency("USD");
+    setCustomLogo("");
+    setAdditionalInfo("");
+    setFullName("");
+    setEmail("");
+    setPhoneNumber("");
     setCountryCode("+91");
-    setEmailError(""); setShowThankYou(false);
-    setGradePrice(0); setPackingPrice(0); setQuantityPrice(0); setLogoPrice(0);
-    setInsurancePrice(0); setFreightPrice(0); setTransportPrice(0); setTransportTotal(0); setTotalPrice(0);
+    setEmailError("");
+    setShowThankYou(false);
+    setGradePrice(0);
+    setPackingPrice(0);
+    setQuantityPrice(0);
+    setLogoPrice(0);
+    setInsurancePrice(0);
+    setFreightPrice(0);
+    setTransportPrice(0);
+    setTransportTotal(0);
+    setTotalPrice(0);
     onClose();
     setStreet("");
     setCity("");
     setAddressState("");
     setAddressCountry("");
     setPincode("");
+    setNumberOfBags(1); // Reset number of bags
   };
 
   const getCurrentCountry = () => countryOptions.find(o => o.value === countryCode);
@@ -579,14 +613,32 @@ const BuyModal = ({
                                 <p className="tw-text-xs tw-text-yellow-200/70">
                                   Qty: {item.quantityUnit || `${item.quantity} unit`}
                                 </p>
+
+                                {/* ADD THIS: Show price per bag */}
+                                {item.pricePerBag && (
+                                  <p className="tw-text-xs tw-text-yellow-200/70">
+                                    Price per bag: ₹{item.pricePerBag.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                  </p>
+                                )}
+
+                                {/* ADD THIS: Show number of bags */}
+                                {item.numberOfBags > 1 && (
+                                  <p className="tw-text-xs tw-text-yellow-200/70">
+                                    Bags: {item.numberOfBags}
+                                  </p>
+                                )}
                               </div>
 
                               <div className="tw-text-right">
                                 <p className="tw-text-yellow-400 tw-font-semibold">
-                                  ₹{(item.totalPrice || item.subtotal || 0).toLocaleString("en-IN")}
+                                  ₹{(item.totalPriceForItem || item.subtotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                                 </p>
+
+                                {/* UPDATE THIS: Show detailed price breakdown */}
                                 <p className="tw-text-[10px] tw-text-yellow-200/50">
-                                  {item.price || "Price on request"}
+                                  {item.numberOfBags > 1
+                                    ? `${item.numberOfBags} × ₹${(item.pricePerBag || item.totalPrice || 0).toLocaleString("en-IN")}`
+                                    : `₹${(item.pricePerBag || item.totalPrice || 0).toLocaleString("en-IN")} per bag`}
                                 </p>
                               </div>
                             </div>
@@ -670,22 +722,62 @@ const BuyModal = ({
                   </label>
 
                   {!isCartOrder && (
-                    <label>
-                      {t("quantity")} *
-                      <select
-                        value={quantity}
-                        onChange={e => setQuantity(e.target.value)}
-                        required
-                        className="select-field"
-                      >
-                        <option value="">{t("select_quantity")}</option>
-                        {quantityOptions.map((q, i) => (
-                          <option key={i} value={q}>
-                            {q}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <>
+                      <label>
+                        {t("quantity")} *
+                        <select
+                          value={quantity}
+                          onChange={e => setQuantity(e.target.value)}
+                          required
+                          className="select-field"
+                        >
+                          <option value="">{t("select_quantity")}</option>
+                          {quantityOptions.map((q, i) => (
+                            <option key={i} value={q}>
+                              {q}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      {/* NEW: Number of bags input */}
+                      <label>
+                        {t("number_of_bags")} *
+                        <div className="tw-flex tw-items-center tw-gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setNumberOfBags(prev => Math.max(1, prev - 1))}
+                            className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400 tw-text-black tw-rounded-md hover:tw-bg-yellow-300 tw-font-bold"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            max="1000"
+                            value={numberOfBags}
+                            onChange={e => {
+                              const val = parseInt(e.target.value) || 1;
+                              setNumberOfBags(Math.max(1, Math.min(1000, val)));
+                            }}
+                            className="tw-flex-1 tw-text-center tw-bg-black/50 tw-border tw-border-yellow-400/30 tw-rounded tw-p-2 tw-text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setNumberOfBags(prev => Math.min(1000, prev + 1))}
+                            className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400 tw-text-black tw-rounded-md hover:tw-bg-yellow-300 tw-font-bold"
+                          >
+                            +
+                          </button>
+                          <span className="tw-ml-2 tw-text-yellow-200">
+                            {numberOfBags} {t("bags")}
+                          </span>
+                        </div>
+                        <p className="tw-text-xs tw-text-gray-400 tw-mt-1">
+                          {t("bag_calculation_note")}
+                        </p>
+                      </label>
+                    </>
                   )}
 
                   <label>
@@ -812,7 +904,7 @@ const BuyModal = ({
 
                 <div className="bill-item">
                   <span>{t("packing_price")}:</span>
-                  <span>{currencyOptions.find(o => o.value === currency)?.symbol}{packingPrice.toFixed(2)} {t("per")} {t("bag")}</span>
+                  <span>{currencyOptions.find(o => o.value === currency)?.symbol}{packingPrice.toFixed(2)} {isCartOrder ? '' : `(${numberOfBags} ${t('bags')})`}</span>
                 </div>
 
                 <div className="bill-item">

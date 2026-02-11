@@ -7,6 +7,7 @@ import { ref, onValue } from "firebase/database";
 const ProductDetailsPanel = ({
     product,
     allProducts,
+    profile,  // This is the user profile prop
     onBack,
     onEnquire,
     onViewDetails,
@@ -128,6 +129,12 @@ const ProductDetailsPanel = ({
     };
 
     const handleCartSubmit = () => {
+        // FIX: Check the profile prop, not product.profile
+        if (!profile) {
+            alert("⚠️ Please login to add items to cart");
+            return;
+        }
+
         if (!selectedGrade) {
             alert('Please select a grade');
             return;
@@ -219,11 +226,19 @@ const ProductDetailsPanel = ({
 
                             {/* Add to Cart Button */}
                             <button
-                                onClick={() => setShowCartModal(true)}
-                                className="tw-bg-blue-500 tw-text-white tw-font-bold tw-px-8 tw-py-3 tw-rounded-xl tw-text-base hover:tw-bg-blue-600 tw-transition"
+                                onClick={() => {
+                                    // FIX: Check the profile prop, not product.profile
+                                    if (!profile) {
+                                        alert("⚠️ Please login to add products to cart");
+                                        return;
+                                    }
+                                    setShowCartModal(true);
+                                }}
+                                className="tw-bg-blue-500 tw-text-white tw-font-bold tw-px-8 tw-py-3 tw-rounded-xl"
                             >
                                 Add to Cart
                             </button>
+
                         </div>
                     </div>
 

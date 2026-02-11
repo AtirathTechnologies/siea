@@ -417,7 +417,7 @@ const SampleCourierService = React.memo(() => {
   const sendToWhatsApp = useCallback(
     async (currency = "INR", amount = null, paymentMethod = "Razorpay") => {
       const fullPhone = contactInfo.countryCode + contactInfo.phone;
-      const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || "919247485871";
+      const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
       const addressStr = `${address.doorNo}, ${address.area}, ${address.town}, ${address.city}, ${address.district} - ${address.pincode}${address.landmark ? ` (Landmark: ${address.landmark})` : ""}`;
 
       const itemsList = selectedItems
@@ -528,7 +528,7 @@ const SampleCourierService = React.memo(() => {
       const order = data.order;
 
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_RfSBzDny9nssx0",
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
         name: import.meta.env.VITE_COMPANY_NAME || "Sai Import Export Agro",

@@ -56,10 +56,16 @@ export default function AdminSidebar({ onLogout }) {
         <NavLink to="/admin/services" style={linkStyle}>
           Services
         </NavLink>
+        <NavLink to="/admin/cif-rates" style={linkStyle}>
+          CIF Rates
+        </NavLink>
+        <NavLink to="/admin/exchange-rates" style={linkStyle}>
+          Exchange Rates
+        </NavLink>
         <NavLink to="/admin/history" style={linkStyle}>
           History
         </NavLink>
-        
+
 
       </nav>
 

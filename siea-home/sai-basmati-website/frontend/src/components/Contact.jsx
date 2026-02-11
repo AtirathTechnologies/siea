@@ -4,6 +4,9 @@ import { useLanguage } from "../contexts/LanguageContext";
 export default function Contact() {
   const { t } = useLanguage();
 
+  const companyEmail = import.meta.env.VITE_COMPANY_EMAIL;
+  const companyPhone = import.meta.env.VITE_COMPANY_PHONE;
+
   return (
     <div className="tw-container tw-mx-auto tw-px-4 sm:tw-px-6 
                 tw-py-8 sm:tw-py-12 
@@ -35,24 +38,27 @@ export default function Contact() {
             </h2>
             <p className="tw-text-lg sm:tw-text-xl tw-font-medium tw-text-gray-200">
               <a
-                href="tel:+918595873862"
-                className="tw-text-blue-300 hover:tw-text-blue-200 tw-underline tw-transition-all tw-duration-200"
+                href={`tel:${companyPhone}`}
+                className="tw-text-blue-300 hover:tw-text-blue-200 
+                           tw-underline tw-transition-all tw-duration-200"
               >
-                +91 8595873862
+                {companyPhone}
               </a>
             </p>
           </div>
 
+          {/* Email */}
           <div>
             <h2 className="tw-text-2xl sm:tw-text-3xl tw-font-bold tw-text-yellow-400 tw-mb-3">
               {t("email")}
             </h2>
             <p className="tw-text-lg sm:tw-text-xl tw-font-medium tw-text-gray-200">
               <a
-                href="mailto:info@saiimportexportagro.com"
-                className="tw-text-blue-300 hover:tw-text-blue-200 tw-underline tw-transition-all tw-duration-200"
+                href={`mailto:${companyEmail}`}
+                className="tw-text-blue-300 hover:tw-text-blue-200 
+                           tw-underline tw-transition-all tw-duration-200"
               >
-                info@saiimportexportagro.com
+                {companyEmail}
               </a>
             </p>
           </div>

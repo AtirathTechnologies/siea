@@ -141,13 +141,11 @@ const ProductCard = ({
 
   const handleViewDetails = (e) => {
     e.stopPropagation();
-    if (!profile) {
-      showWarning();
-      return;
-    }
+
     const productId = product.firebaseId || product.id;
-    showBuyQuery(productId, "details");
+    showBuyQuery(productId, "details"); // ✅ login unna / lekapoyina open
   };
+
 
   const handleAddToCart = (e) => {
     e.stopPropagation();
