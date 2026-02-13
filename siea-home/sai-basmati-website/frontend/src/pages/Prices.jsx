@@ -1,3 +1,4 @@
+// Prices.jsx - COMPLETE (modified handleSelectDestination)
 import React, { useEffect, useState, useRef } from "react";
 import { db } from "../firebase";
 import { ref, onValue } from "firebase/database";
@@ -37,8 +38,6 @@ const Prices = () => {
     const savedCurrency = localStorage.getItem('selectedCurrency');
     return savedCurrency || "INR";
   });
-
-  
 
   /* ------------------ PACKING OPTIONS ------------------ */
   const [packing, setPacking] = useState(() => {
@@ -159,16 +158,16 @@ const Prices = () => {
 
   // Handle packing change
   const handlePackingChange = (newPacking) => {
-    console.log("Changing packing to:", newPacking);
     setPacking(newPacking);
     setShowPackingDropdown(false);
   };
 
   // Toggle packing dropdown
   const togglePackingDropdown = () => {
-    console.log("Toggling dropdown, current state:", showPackingDropdown);
     setShowPackingDropdown(!showPackingDropdown);
   };
+
+  // Fetch exchange rates from Firebase
   useEffect(() => {
     const ratesRef = ref(db, "exchangeRates/rates");
 
@@ -180,13 +179,11 @@ const Prices = () => {
     });
   }, []);
 
-
   // Fetch data based on selected currency
   useEffect(() => {
     setLoading(true);
 
     if (currency === "INR") {
-      // Fetch from market_rates for INR
       const marketRatesRef = ref(db, "market_rates/");
       console.log("Fetching INR data from market_rates");
 
@@ -197,7 +194,6 @@ const Prices = () => {
           setMarketRatesData(allData);
           setCifRatesData([]);
 
-          // Set selected state to first state key if it exists
           const states = Object.keys(allData);
           if (states.length > 0) {
             setSelectedState(states[0]);
@@ -213,7 +209,6 @@ const Prices = () => {
         setLoading(false);
       });
     } else {
-      // Fetch from cifRates for USD/EUR/GBP/AED
       const cifRatesRef = ref(db, "cifRates/");
       console.log(`Fetching ${currency} data from cifRates`);
 
@@ -222,7 +217,6 @@ const Prices = () => {
           const cifData = snapshot.val();
           console.log("Fetched cifRates data:", cifData);
 
-          // Check if data is an array or needs to be converted
           let dataArray = [];
           if (Array.isArray(cifData)) {
             dataArray = cifData;
@@ -245,13 +239,19 @@ const Prices = () => {
     }
   }, [currency]);
 
-  // Function to navigate to SeaFreight page
+  // --- MODIFIED: navigate to SeaFreight with proper return URL ---
   const handleSelectDestination = () => {
+    // Save current page state (optional)
     localStorage.setItem('pricesPageState', JSON.stringify({
       currency,
       selectedState,
       packing
     }));
+
+    // --- IMPORTANT: Clear any leftover modal data (ensures BuyModal doesn't auto-open) ---
+    localStorage.removeItem('seaFreightModalData');
+    // --- Set return URL to this page ---
+    localStorage.setItem('seaFreightReturnTo', '/market-rates');
 
     navigate('/sea-freight');
   };
@@ -296,7 +296,6 @@ const Prices = () => {
     const price = parseFloat(priceInUSD);
     if (isNaN(price)) return "0";
 
-    // Convert USD price to selected currency
     const convertedPrice = price * exchangeRates[currency];
 
     if (convertedPrice === Math.floor(convertedPrice)) {
@@ -380,7 +379,6 @@ const Prices = () => {
     const basmatiItems = [];
     const nonBasmatiItems = [];
 
-    // Group by Grade
     const groupedByGrade = {};
 
     cifRatesData.forEach((item, dataIndex) => {
@@ -397,7 +395,6 @@ const Prices = () => {
         };
       }
 
-      // Get USD prices
       let fobUSD, cifMinUSD, cifMaxUSD;
 
       if (item.FOB_USD !== undefined) {
@@ -427,31 +424,25 @@ const Prices = () => {
       const country = item.Country || item.country || "UAE";
       const region = item.Region || item.region || "Middle East";
 
-      // Check if this item matches the selected destination
       const matchesPort = selectedCifDestination.port === "All Ports" ||
         destinationPort === selectedCifDestination.port;
       const matchesContainer = selectedCifDestination.container === "All Containers" ||
         container === selectedCifDestination.container;
 
       if (matchesPort && matchesContainer) {
-        // Get packing adjustment for selected packing
         const packingAdjustment = getPackingAdjustment(packing);
 
-        // Apply packing adjustment to prices
         const adjustedFobUSD = fobUSD * packingAdjustment;
         const adjustedCifMinUSD = cifMinUSD * packingAdjustment;
         const adjustedCifMaxUSD = cifMaxUSD * packingAdjustment;
 
-        // Convert to selected currency
         const fobPrice = convertSinglePrice(adjustedFobUSD);
         const cifMinPrice = convertSinglePrice(adjustedCifMinUSD);
         const cifMaxPrice = convertSinglePrice(adjustedCifMaxUSD);
 
-        // Get FOB price ranges if they exist
         const fobMin = item.Origin_FOB_Min ? convertSinglePrice(parseFloat(item.Origin_FOB_Min) * packingAdjustment) : fobPrice;
         const fobMax = item.Origin_FOB_Max ? convertSinglePrice(parseFloat(item.Origin_FOB_Max) * packingAdjustment) : fobPrice;
 
-        // Create price strings
         const fobPriceStr = fobMin === fobMax ? fobMin : `${fobMin}-${fobMax}`;
 
         let cifPriceStr;
@@ -480,7 +471,6 @@ const Prices = () => {
       }
     });
 
-    // Filter out empty grade groups and categorize
     Object.values(groupedByGrade).forEach(gradeGroup => {
       if (gradeGroup.items.length > 0) {
         if (gradeGroup.isBasmati) {
@@ -491,7 +481,6 @@ const Prices = () => {
       }
     });
 
-    // If no items match the selected destination, show first available destination
     if (basmatiItems.length === 0 && nonBasmatiItems.length === 0 && cifRatesData.length > 0) {
       const firstItem = cifRatesData[0];
       const firstDestinationPort = firstItem["Destination Port"] || firstItem.destinationPort || firstItem.Destination || "Jebel Ali";
@@ -522,10 +511,8 @@ const Prices = () => {
   const states = Object.keys(marketRatesData);
   const isMobile = window.innerWidth < 640;
 
-  // Process CIF data for foreign currencies
   const processedCifData = currency !== "INR" ? processCifData() : { basmati: [], nonBasmati: [] };
 
-  // Get currency symbol
   const getCurrencySymbol = () => {
     const symbols = {
       USD: "$",
@@ -541,7 +528,6 @@ const Prices = () => {
     <div style={styles.container}>
       <h1 style={styles.mainTitle}>Basmati & Non-Basmati Market Rates</h1>
 
-      {/* Currency Control */}
       <div style={styles.currencyBox}>
         <label style={styles.currencyLabel}>Currency:</label>
         <select
@@ -557,7 +543,6 @@ const Prices = () => {
         </select>
       </div>
 
-      {/* State Tabs - ONLY SHOW WHEN CURRENCY IS INR */}
       {currency === "INR" && states.length > 0 && (
         <div style={styles.tabRow}>
           {states.map((state) => (
@@ -581,14 +566,10 @@ const Prices = () => {
         </div>
       )}
 
-      {/* Data Card */}
       <div style={styles.card}>
-        {/* When currency is not INR, show a general title */}
         {currency !== "INR" ? (
           <>
-            <h2 style={styles.stateTitle}>
-              INDIAN RICE EXPORT PRICES
-            </h2>
+            <h2 style={styles.stateTitle}>INDIAN RICE EXPORT PRICES</h2>
           </>
         ) : (
           <h2 style={styles.stateTitle}>
@@ -596,10 +577,8 @@ const Prices = () => {
           </h2>
         )}
 
-        {/* Show CIF data when currency is not INR */}
         {currency !== "INR" ? (
           <>
-            {/* BASMATI from CIF data */}
             {processedCifData.basmati.length > 0 ? (
               <>
                 <h3 style={styles.sectionTitle}>
@@ -612,7 +591,6 @@ const Prices = () => {
                   </span>
                 </div>
 
-                {/* Table view for desktop */}
                 {!isMobile && (
                   <div style={styles.tableHeader}>
                     <div style={styles.headerCell}>Rice Grade</div>
@@ -671,7 +649,6 @@ const Prices = () => {
                       const currencySymbol = getCurrencySymbol();
 
                       return isMobile ? (
-                        // MOBILE VIEW
                         <div
                           key={i}
                           style={{
@@ -713,7 +690,6 @@ const Prices = () => {
                           </div>
                         </div>
                       ) : (
-                        // DESKTOP TABLE VIEW
                         <div
                           key={i}
                           style={{
@@ -721,23 +697,15 @@ const Prices = () => {
                             gridTemplateColumns: "2fr 1fr 1fr 1fr",
                           }}
                         >
-                          {/* GRADE COLUMN */}
                           <div style={styles.qualityCell}>
                             <div style={styles.rowLabel}>{item.type}</div>
-
                           </div>
-
-                          {/* PACKING COLUMN */}
                           <div style={styles.packingCell}>
                             <div style={styles.packingValue}>{packing}</div>
                           </div>
-
-                          {/* FOB COLUMN */}
                           <div style={styles.fobCell}>
                             <div style={styles.priceValue}>{currencySymbol}{item.fobPrice}</div>
                           </div>
-
-                          {/* CIF COLUMN */}
                           <div style={styles.cifCell}>
                             <div style={styles.priceValue}>{currencySymbol}{item.cifPrice}</div>
                           </div>
@@ -767,7 +735,6 @@ const Prices = () => {
               </div>
             )}
 
-            {/* NON BASMATI from CIF data */}
             {processedCifData.nonBasmati.length > 0 && (
               <>
                 <h3 style={styles.sectionTitle}>
@@ -780,7 +747,6 @@ const Prices = () => {
                   </span>
                 </div>
 
-                {/* Table view for desktop */}
                 {!isMobile && (
                   <div style={styles.tableHeader}>
                     <div style={styles.headerCell}>Rice Grade</div>
@@ -820,7 +786,6 @@ const Prices = () => {
                       const currencySymbol = getCurrencySymbol();
 
                       return isMobile ? (
-                        // MOBILE VIEW
                         <div
                           key={i}
                           style={{
@@ -862,7 +827,6 @@ const Prices = () => {
                           </div>
                         </div>
                       ) : (
-                        // DESKTOP TABLE VIEW
                         <div
                           key={i}
                           style={{
@@ -870,23 +834,15 @@ const Prices = () => {
                             gridTemplateColumns: "2fr 1fr 1fr 1fr",
                           }}
                         >
-                          {/* GRADE COLUMN */}
                           <div style={styles.qualityCell}>
                             <div style={styles.rowLabel}>{item.type}</div>
-
                           </div>
-
-                          {/* PACKING COLUMN */}
                           <div style={styles.packingCell}>
                             <div style={styles.packingValue}>{packing}</div>
                           </div>
-
-                          {/* FOB COLUMN */}
                           <div style={styles.fobCell}>
                             <div style={styles.priceValue}>{currencySymbol}{item.fobPrice}</div>
                           </div>
-
-                          {/* CIF COLUMN */}
                           <div style={styles.cifCell}>
                             <div style={styles.priceValue}>{currencySymbol}{item.cifPrice}</div>
                           </div>
@@ -898,7 +854,6 @@ const Prices = () => {
               </>
             )}
 
-            {/* Fallback: Show all CIF data if categorization didn't work */}
             {processedCifData.basmati.length === 0 && processedCifData.nonBasmati.length === 0 && cifRatesData.length > 0 && (
               <div style={styles.varietyCard}>
                 <h3 style={styles.sectionTitle}>
@@ -915,10 +870,8 @@ const Prices = () => {
                   const currencySymbol = getCurrencySymbol();
                   const grade = item.Grade || item.grade || "Unknown";
 
-                  // Get packing adjustment
                   const packingAdjustment = getPackingAdjustment(packing);
 
-                  // Apply packing adjustment
                   const fobUSD = parseFloat(item.FOB_USD || item.FOB || item.fob || 0) * packingAdjustment;
                   const cifMinUSD = parseFloat(item.Region_Grade_CIF_Min || item.CIF_USD || item.CIF || 0) * packingAdjustment;
                   const cifMaxUSD = parseFloat(item.Region_Grade_CIF_Max || item.CIF_USD || item.CIF || 0) * packingAdjustment;
@@ -959,9 +912,7 @@ const Prices = () => {
             )}
           </>
         ) : (
-          // ORIGINAL LOGIC FOR INR CURRENCY (market_rates data)
           <>
-            {/* BASMATI for selected state */}
             {marketRatesData[selectedState]?.basmati && (
               <>
                 <h3 style={styles.sectionTitle}>
@@ -1005,7 +956,6 @@ const Prices = () => {
               </>
             )}
 
-            {/* NON BASMATI for selected state */}
             {marketRatesData[selectedState]?.non_basmati && (
               <>
                 <h3 style={styles.sectionTitle}>
@@ -1051,7 +1001,6 @@ const Prices = () => {
           </>
         )}
 
-        {/* No data message */}
         {currency === "INR" && states.length === 0 && (
           <div style={styles.noData}>
             <p>No market rates data available for INR currency.</p>
@@ -1068,7 +1017,6 @@ const Prices = () => {
   );
 };
 
-// Styles
 const styles = {
   container: {
     background: "#000",
@@ -1194,7 +1142,6 @@ const styles = {
     marginBottom: "10px",
   },
 
-  // Table Header with Packing Dropdown
   tableHeader: {
     display: "grid",
     gridTemplateColumns: "2fr 1fr 1fr 1fr",
@@ -1267,7 +1214,6 @@ const styles = {
     display: "block",
   },
 
-  // Row styles
   row: {
     display: "grid",
     gap: "12px",
@@ -1416,7 +1362,6 @@ const styles = {
     fontSize: "16px",
   },
 
-  // CIF Header with dropdown arrow
   cifHeader: {
     display: "flex",
     alignItems: "center",
@@ -1454,37 +1399,38 @@ const styles = {
 
 // Add CSS animation for the loader
 const styleSheet = document.styleSheets[0];
-styleSheet.insertRule(`
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`, styleSheet.cssRules.length);
+if (styleSheet) {
+  styleSheet.insertRule(`
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `, styleSheet.cssRules.length);
 
-// Add hover effects
-styleSheet.insertRule(`
-  .packing-option:hover {
-    background: #FFD700 !important;
-    color: #000 !important;
-  }
-`, styleSheet.cssRules.length);
+  styleSheet.insertRule(`
+    .packing-option:hover {
+      background: #FFD700 !important;
+      color: #000 !important;
+    }
+  `, styleSheet.cssRules.length);
 
-styleSheet.insertRule(`
-  .packing-header:hover {
-    background: rgba(255, 215, 0, 0.1) !important;
-  }
-`, styleSheet.cssRules.length);
+  styleSheet.insertRule(`
+    .packing-header:hover {
+      background: rgba(255, 215, 0, 0.1) !important;
+    }
+  `, styleSheet.cssRules.length);
 
-styleSheet.insertRule(`
-  .cif-dropdown-arrow:hover {
-    transform: scale(1.2) !important;
-  }
-`, styleSheet.cssRules.length);
+  styleSheet.insertRule(`
+    .cif-dropdown-arrow:hover {
+      transform: scale(1.2) !important;
+    }
+  `, styleSheet.cssRules.length);
 
-styleSheet.insertRule(`
-  .change-destination-button:hover {
-    background: #1976D2 !important;
-  }
-`, styleSheet.cssRules.length);
+  styleSheet.insertRule(`
+    .change-destination-button:hover {
+      background: #1976D2 !important;
+    }
+  `, styleSheet.cssRules.length);
+}
 
 export default Prices;

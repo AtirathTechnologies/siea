@@ -12,8 +12,10 @@ const emptyForm = () => ({
   Container: "20FT",
   "Origin Port": "Mundra",
   "Destination Port": "",
-  FOB_USD: "",
-  CIF_USD: "",
+  Origin_FOB_Min: "",
+  Origin_FOB_Max: "",
+  Region_Grade_CIF_Min: "",
+  Region_Grade_CIF_Max: "",
   Freight_USD: "",
   Insurance_USD: "",
   Port_Charges_USD: "",
@@ -85,7 +87,12 @@ const CIFRatesAdmin = () => {
 
   /* ---------------- FORM HANDLERS ---------------- */
   const saveRate = async () => {
-    if (!form.Grade || !form.Country || !form.CIF_USD) {
+    if (
+      !form.Grade ||
+      !form.Country ||
+      !form.Region_Grade_CIF_Min ||
+      !form.Region_Grade_CIF_Max
+    ) {
       alert("Grade, Country and CIF are required");
       return;
     }
@@ -199,8 +206,10 @@ const CIFRatesAdmin = () => {
               "Grade",
               "Country",
               "Destination Port",
-              "FOB_USD",
-              "CIF_USD",
+              "Origin_FOB_Min",
+              "Origin_FOB_Max",
+              "Region_Grade_CIF_Min",
+              "Region_Grade_CIF_Max",
             ].map(field => (
               <input
                 key={field}
@@ -242,8 +251,10 @@ const CIFRatesAdmin = () => {
               <th className="tw-p-3">Grade</th>
               <th className="tw-p-3">Country</th>
               <th className="tw-p-3">Port</th>
-              <th className="tw-p-3">FOB</th>
-              <th className="tw-p-3">CIF</th>
+              <th className="tw-p-3">FOB Min</th>
+              <th className="tw-p-3">FOB Max</th>
+              <th className="tw-p-3">CIF Min</th>
+              <th className="tw-p-3">CIF Max</th>
               <th className="tw-p-3">Actions</th>
             </tr>
           </thead>
@@ -254,8 +265,14 @@ const CIFRatesAdmin = () => {
                 <td className="tw-p-3 tw-text-yellow-400">{r.Grade}</td>
                 <td className="tw-p-3">{r.Country}</td>
                 <td className="tw-p-3">{r["Destination Port"]}</td>
-                <td className="tw-p-3">${r.FOB_USD}</td>
-                <td className="tw-p-3 tw-font-bold">${r.CIF_USD}</td>
+                <td className="tw-p-3">${r.Origin_FOB_Min}</td>
+                <td className="tw-p-3">${r.Origin_FOB_Max}</td>
+                <td className="tw-p-3 tw-font-bold">
+                  ${r.Region_Grade_CIF_Min}
+                </td>
+                <td className="tw-p-3 tw-font-bold">
+                  ${r.Region_Grade_CIF_Max}
+                </td>
                 <td className="tw-p-3 tw-flex tw-gap-2">
                   <button
                     onClick={() => {
@@ -279,7 +296,7 @@ const CIFRatesAdmin = () => {
             {filteredRates.length === 0 && (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="8"
                   className="tw-text-center tw-p-6 tw-text-gray-400"
                 >
                   No CIF rates found

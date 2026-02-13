@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCart } from '../contexts/CartContext.jsx';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getCartWithLivePrices, saveCartOrder } from '../firebase';
 import BuyModal from './BuyModal';
@@ -10,6 +10,7 @@ const Cart = () => {
   const { t } = useLanguage();
   const { cartItems, removeFromCart, updateQuantity, clearCart } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
@@ -23,6 +24,41 @@ const Cart = () => {
   const [profile, setProfile] = useState(null);
   const [showThankYou, setShowThankYou] = useState(false);
   const [localCartItems, setLocalCartItems] = useState([]);
+
+  // ---------- AUTO‑REOPEN MODAL AFTER SEAFREIGHT ----------
+  useEffect(() => {
+    const checkAndOpenModal = () => {
+      const modalData = localStorage.getItem('seaFreightModalData');
+      const returnTo = localStorage.getItem('seaFreightReturnTo');
+      const normalizedPath = window.location.pathname.replace(/\/$/, '');
+
+      if (modalData && returnTo === normalizedPath) {
+        try {
+          const data = JSON.parse(modalData);
+          if (data.cartItems) {
+            setLocalCartItems(data.cartItems);
+          }
+        } catch (e) {
+          console.error('Error parsing seaFreightModalData:', e);
+        }
+        
+        setShowBuyModal(true);
+        localStorage.removeItem('seaFreightModalData');
+        // seaFreightReturnTo will be removed by BuyModal
+      }
+    };
+
+    checkAndOpenModal();
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'seaFreightReturnTo' || e.key === 'seaFreightModalData') {
+        checkAndOpenModal();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [location.pathname]);
 
   // Load profile from localStorage
   useEffect(() => {
@@ -87,7 +123,6 @@ const Cart = () => {
             priceUpdated: false,
             isTotalPriceItem: isTotalPriceItem,
             pricePerBag: pricePerBag,
-            // Calculate total price for this item
             totalPriceForItem: subtotal
           };
         });
@@ -111,7 +146,6 @@ const Cart = () => {
                 displayPrice: pricePerBag,
                 subtotal: subtotal,
                 pricePerBag: pricePerBag,
-                // Calculate total price for this item
                 totalPriceForItem: subtotal
               };
             });
@@ -139,7 +173,6 @@ const Cart = () => {
                 priceUpdated: false,
                 isTotalPriceItem: false,
                 pricePerBag: pricePerBag,
-                // Calculate total price for this item
                 totalPriceForItem: subtotal
               };
             });
@@ -189,7 +222,6 @@ const Cart = () => {
             priceUpdated: false,
             isTotalPriceItem: item.totalPrice ? true : false,
             pricePerBag: item.totalPrice || item.displayPrice || 0,
-            // Calculate total price for this item
             totalPriceForItem: (item.totalPrice || item.displayPrice || 0) * (item.numberOfBags || 1)
           })),
           subtotal,
@@ -230,14 +262,14 @@ const Cart = () => {
 
   // Format price function
   const formatPrice = useCallback((price) => {
-  if (price === undefined || price === null || isNaN(price)) return 'Price on request';
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(price);
-}, []);
+    if (price === undefined || price === null || isNaN(price)) return 'Price on request';
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(price);
+  }, []);
 
   // Custom submit handler for cart orders (passed to BuyModal)
   const handleCartSubmit = async (formData) => {
@@ -294,7 +326,6 @@ const Cart = () => {
         (formData.cif ? `📦 CIF: ${formData.cif}\n` : '') +
         (formData.currency ? `💰 Currency: ${formData.currency}\n` : '') +
         (formData.customLogo ? `🏷️ Custom Logo: ${formData.customLogo}\n` : '') +
-        // In the WhatsApp message in handleCartSubmit function, update the cart items section:
         `\n*Cart Items Details:*\n` +
         liveCartData.items.map((item, index) => {
           const numberOfBags = item.numberOfBags || 1;
@@ -496,11 +527,6 @@ const Cart = () => {
                                 <p className="tw-text-lg tw-font-bold tw-text-yellow-400">
                                   {formatPrice(totalForItem)}
                                 </p>
-                                {/* <p className="tw-text-sm tw-text-yellow-200/60">
-                                  {numberOfBags > 1 ?
-                                    `${numberOfBags} bags × ${formatPrice(pricePerBag)}`
-                                    : `Price per bag: ${formatPrice(pricePerBag)}`}
-                                </p> */}
                                 {item.priceUpdated && (
                                   <span className="tw-text-xs tw-text-green-400 tw-bg-green-900/30 tw-px-2 tw-py-0.5 tw-rounded tw-mt-1">
                                     Price Updated
@@ -543,7 +569,6 @@ const Cart = () => {
                               {/* Number of Bags Controls */}
                               <div className="tw-flex tw-items-center tw-space-x-3 tw-bg-black/50 tw-p-2 tw-rounded-lg">
                                 <div className="tw-flex tw-flex-col">
-                                  {/* <span className="tw-text-xs tw-text-yellow-200/60 tw-mb-1">Number of Bags</span> */}
                                   <div className="tw-flex tw-items-center tw-space-x-3">
                                     <button
                                       onClick={() => updateNumberOfBags(item.id, item.grade, numberOfBags - 1)}
@@ -565,15 +590,6 @@ const Cart = () => {
                                   </div>
                                 </div>
                               </div>
-
-                              {/* Summary */}
-                              {/* <div className="tw-text-sm tw-text-yellow-200/60">
-                                {!isTotalPriceItem && item.quantity !== undefined && (
-                                  <p>{item.quantity} unit{item.quantity > 1 ? 's' : ''} per bag</p>
-                                )}
-                                <p>{numberOfBags} bag{numberOfBags > 1 ? 's' : ''} total</p>
-                                <p>Total: {formatPrice(totalForItem)}</p>
-                              </div> */}
                             </div>
 
                             <button

@@ -1,3 +1,4 @@
+// SeaFreight.jsx - COMPLETE (modified to return to previous page)
 import React, { useState, useEffect } from 'react';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
 import { db } from '../firebase';
@@ -85,7 +86,6 @@ const SeaFreight = () => {
                 regionData.countries.push(countryData);
             }
 
-            // Check if port already exists, if not add it
             if (!countryData.ports.some(p => p.name === port)) {
                 countryData.ports.push({
                     name: port,
@@ -130,27 +130,32 @@ const SeaFreight = () => {
         setOpenPorts(true);
     };
 
-    // Handle port selection - automatically navigate back to Prices with USD
-    // Handle port selection - automatically navigate back to Prices with USD
-const handlePortSelect = (port) => {
-  setSelectedPort(port);
+    // --- MODIFIED: return to the page stored in localStorage, DO NOT remove returnTo ---
+    const handlePortSelect = (port) => {
+        setSelectedPort(port);
 
-  // Save the selected destination to localStorage
-  const destinationData = {
-    region: selectedRegion,
-    country: selectedCountry,
-    port: port.name,
-    container: port.container || "All Containers"
-  };
+        const destinationData = {
+            region: selectedRegion,
+            country: selectedCountry,
+            port: port.name,
+            container: port.container || "All Containers"
+        };
 
-  localStorage.setItem('selectedCifDestination', JSON.stringify(destinationData));
-  
-  // Force USD when coming from SeaFreight
-  localStorage.setItem('forceCurrencyToUSD', 'true');
+        localStorage.setItem('selectedCifDestination', JSON.stringify(destinationData));
+        localStorage.setItem('forceCurrencyToUSD', 'true');
 
-  // Navigate back to Prices page
-  navigate('/market-rates');
-};
+        const returnTo = localStorage.getItem('seaFreightReturnTo');
+        console.log('🔁 SeaFreight handlePortSelect');
+        console.log('   returnTo from localStorage:', returnTo);
+
+        if (returnTo) {
+            console.log('   Navigating to:', returnTo);
+            navigate(returnTo);
+        } else {
+            console.log('   No returnTo found, defaulting to /market-rates');
+            navigate('/market-rates');
+        }
+    };
 
     if (loading) {
         return (
@@ -566,11 +571,13 @@ const styles = {
 
 // Add CSS animation for the loader
 const styleSheet = document.styleSheets[0];
-styleSheet.insertRule(`
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`, styleSheet.cssRules.length);
+if (styleSheet) {
+    styleSheet.insertRule(`
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `, styleSheet.cssRules.length);
+}
 
 export default SeaFreight;

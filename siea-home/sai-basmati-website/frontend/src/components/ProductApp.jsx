@@ -17,7 +17,6 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-
   // Currency State
   const [currency, setCurrency] = useState("INR");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -33,6 +32,46 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
   const [detailsProduct, setDetailsProduct] = useState(null);
   const productsContainerRef = useRef(null);
 
+  // ---------- AUTO‑REOPEN MODAL AFTER SEAFREIGHT (CIF DESTINATION SELECTION) ----------
+  useEffect(() => {
+    const checkAndOpenModal = () => {
+      const modalData = localStorage.getItem('seaFreightModalData');
+      const returnTo = localStorage.getItem('seaFreightReturnTo');
+      const normalizedPath = window.location.pathname.replace(/\/$/, '');
+
+      if (modalData && returnTo === normalizedPath) {
+        try {
+          const data = JSON.parse(modalData);
+          // Restore the product (for single‑product orders)
+          if (data.product) {
+            setSelectedProduct(data.product);
+          }
+          // Cart orders are handled separately in Cart.jsx
+        } catch (error) {
+          console.error('Error parsing seaFreightModalData:', error);
+        }
+
+        // Open the modal
+        setIsBuyModalOpen(true);
+        // Clean up modal data – we only need it once
+        localStorage.removeItem('seaFreightModalData');
+        // seaFreightReturnTo will be removed by BuyModal or Cart when modal opens
+      }
+    };
+
+    // Run immediately on mount
+    checkAndOpenModal();
+
+    // Also listen for storage events (in case the navigation doesn't remount the component)
+    const handleStorageChange = (e) => {
+      if (e.key === 'seaFreightReturnTo' || e.key === 'seaFreightModalData') {
+        checkAndOpenModal();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [location.pathname]); // Re-run when pathname changes
 
   useEffect(() => {
     if (detailsProduct && productsContainerRef.current) {
@@ -44,11 +83,6 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
       });
     }
   }, [detailsProduct]);
-
-
-
-
-
 
   // Currency Configuration
   const currencies = [
@@ -64,7 +98,6 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
   const getConversionRate = () => currentCurrency.rate;
   const getCurrencySymbol = () => currentCurrency.symbol;
 
-  // Fetch products
   // Fetch products + preserve Firebase key as firebaseId
   useEffect(() => {
     const r = ref(db, "products");
@@ -73,7 +106,7 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
         const data = snap.val();
         const list = Object.keys(data).map(key => ({
           ...data[key],
-          firebaseId: key  // This is the REAL Firebase node key
+          firebaseId: key
         }));
         setAllProducts(list);
         setFilteredProducts(list);
@@ -85,6 +118,7 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
     return () => unsubscribe();
   }, []);
 
+  // Handle opening product details from navigation state
   useEffect(() => {
     if (
       location.state?.openDetails &&
@@ -104,8 +138,7 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
     }
   }, [location.state, allProducts]);
 
-
-  // Filtering
+  // Filter products based on category and search query
   useEffect(() => {
     let filtered = allProducts;
 
@@ -126,39 +159,32 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
       );
     }
 
-
     setFilteredProducts(filtered);
   }, [filteredCategory, searchQuery, allProducts]);
 
-
+  // Unified handler for "Buy" or "Details" from the product card
   const showBuyQuery = (productId, type = "buy") => {
     const product = allProducts.find(
       p => p.firebaseId === productId || p.id === productId
     );
 
     if (type === "details") {
-      // scrollOnDetailsChangeRef.current = false; // 👈 IMPORTANT
-
       setIsSidebarOpen(false);
       setShowRssFeed(false);
       setDetailsProduct(product);
-    }
-    else {
+    } else {
       setSelectedProduct(product);
       setIsBuyModalOpen(true);
     }
   };
 
-
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   return (
     <div className="flex flex-1">
-
       <div className={showRssFeed ? "" : "tw-hidden"}>
         <BasmatiRSSFeed />
       </div>
-
 
       {/* Currency Selector - Top Right */}
       <div className="tw-fixed tw-top-25 sm:tw-top-21 tw-right-4 sm:tw-right-8 tw-z-50">
@@ -190,10 +216,12 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
       </div>
 
       <div className="flex flex-1 mt-14">
+        {/* Sidebar (only visible when no product details are shown) */}
         {!detailsProduct && (
           <div
-            className={`fixed top-[60px] bottom-[64px] transition-all duration-300 ${detailsProduct ? "tw-hidden" : isSidebarOpen ? "w-64" : "w-0"
-              } bg-[#111111] z-40 overflow-hidden`}
+            className={`fixed top-[60px] bottom-[64px] transition-all duration-300 ${
+              detailsProduct ? "tw-hidden" : isSidebarOpen ? "w-64" : "w-0"
+            } bg-[#111111] z-40 overflow-hidden`}
           >
             <Sidebar
               filteredCategory={filteredCategory}
@@ -202,22 +230,19 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
               toggleSidebar={toggleSidebar}
             />
           </div>
-
         )}
 
-
-
+        {/* Main content area */}
         <div
           ref={productsContainerRef}
-          className={`products-container flex-1 transition-all duration-300 p-4 ${detailsProduct
-            ? 'details-open'
-            : isSidebarOpen
+          className={`products-container flex-1 transition-all duration-300 p-4 ${
+            detailsProduct
+              ? 'details-open'
+              : isSidebarOpen
               ? 'sidebar-open'
               : ''
-            }`}
+          }`}
         >
-
-
           {detailsProduct ? (
             <ProductDetailsPanel
               product={detailsProduct}
@@ -231,7 +256,6 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
                   setShowRssFeed(true);
                 }
               }}
-
               onEnquire={() => {
                 if (!profile) {
                   showWarning();
@@ -243,12 +267,9 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
               onViewDetails={(prod) => {
                 setDetailsProduct(prod);
               }}
-
-
               getConversionRate={getConversionRate}
               getCurrencySymbol={getCurrencySymbol}
             />
-
           ) : (
             <ProductsGrid
               products={filteredProducts}
@@ -260,24 +281,32 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
               getCurrencySymbol={getCurrencySymbol}
             />
           )}
-
-
         </div>
       </div>
 
+      {/* BuyModal – used for both single‑product and cart orders */}
       <BuyModal
         isOpen={isBuyModalOpen}
-        onClose={() => { setIsBuyModalOpen(false); setSelectedProduct(null); }}
+        onClose={() => {
+          setIsBuyModalOpen(false);
+          setSelectedProduct(null);
+        }}
         product={selectedProduct}
         products={allProducts}
-        onSubmit={() => { setIsBuyModalOpen(false); setIsThankYouOpen(true); }}
+        onSubmit={() => {
+          setIsBuyModalOpen(false);
+          setIsThankYouOpen(true);
+        }}
         profile={profile}
         currency={currency}
         getConversionRate={getConversionRate}
         getCurrencySymbol={getCurrencySymbol}
       />
 
-      <ThankYouPopup isOpen={isThankYouOpen} onClose={() => setIsThankYouOpen(false)} />
+      <ThankYouPopup
+        isOpen={isThankYouOpen}
+        onClose={() => setIsThankYouOpen(false)}
+      />
     </div>
   );
 };
@@ -289,6 +318,5 @@ const ProductApp = ({ profile, setProfile, showWarning, searchQuery }) => (
     searchQuery={searchQuery}
   />
 );
-
 
 export default ProductApp;
