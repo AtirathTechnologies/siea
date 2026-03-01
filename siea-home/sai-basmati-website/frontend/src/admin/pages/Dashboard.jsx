@@ -1,7 +1,7 @@
 // src/admin/Dashboard.jsx - Dashboard with charts + new order alert
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ref, onValue, off } from "firebase/database";
+import { ref, onValue, off, query, limitToLast } from "firebase/database";
 import { db } from "../../firebase";         // Users, Products, Services
 // import { db as dbQuote } from "../../firebasequote";   // Orders & Quotes
 
@@ -11,7 +11,7 @@ import {
   PieChart, Pie, Cell, Legend,
   BarChart, Bar
 } from "recharts";
-  
+
 const ALERT_BEEP_BASE64 = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA..."; // short placeholder
 // NOTE: above is placeholder. Browser will accept short silent beep; replace if you want.
 
@@ -69,7 +69,7 @@ export default function Dashboard() {
     }));
 
     // QUOTE DB: listen to entire quotes node (bulk & sample combined)
-    const quotesRef = ref(db, "quotes");
+    const quotesRef = query(ref(db, "quotes"), limitToLast(300));
     quotesListenerRef.current = (snap) => {
       const raw = snap.val() || {};
 
@@ -93,7 +93,7 @@ export default function Dashboard() {
                 id,
                 ...order,
                 type: inferTypeFromBucketKey(k, order),
-                timestamp: order.timestamp || Date.now()
+                timestamp: order.timestamp || 0
               });
             });
             return;
@@ -105,7 +105,7 @@ export default function Dashboard() {
             id: k,
             ...v,
             type: v.type || inferTypeFromOrder(v),
-            timestamp: v.timestamp || Date.now()
+            timestamp: v.timestamp || 0
           });
         }
       });
@@ -188,19 +188,30 @@ export default function Dashboard() {
   };
 
   const calc7DayCounts = (orders) => {
-    // returns array for last 7 days: [{ day: '07 Dec', count: 3 }, ...] oldest->newest
-    const days = [];
     const today = new Date();
-    for (let i = 6; i >= 0; i--) {
+    const map = {};
+
+    for (let i = 0; i < 7; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const start = new Date(d).setHours(0, 0, 0, 0);
-      const end = new Date(d).setHours(23, 59, 59, 999);
-      const count = orders.filter(o => (o.timestamp || 0) >= start && (o.timestamp || 0) <= end).length;
-      const label = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-      days.push({ day: label, count });
+      const key = d.toLocaleDateString();
+      map[key] = 0;
     }
-    return days;
+
+    orders.forEach(o => {
+      const d = new Date(o.timestamp || 0);
+      const key = d.toLocaleDateString();
+      if (map.hasOwnProperty(key)) {
+        map[key]++;
+      }
+    });
+
+    return Object.keys(map)
+      .sort((a, b) => new Date(a) - new Date(b))
+      .map(key => ({
+        day: new Date(key).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+        count: map[key]
+      }));
   };
 
   const calcTypePie = (orders) => {

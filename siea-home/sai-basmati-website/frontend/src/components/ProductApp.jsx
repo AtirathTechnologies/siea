@@ -1,18 +1,22 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from "../firebase";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, get } from "firebase/database";
 import Sidebar from '../components/Sidebar';
 import ProductsGrid from '../pages/ProductsGrid';
 import BuyModal from '../pages/BuyModal';
 import ThankYouPopup from '../components/ThankYouPopup';
 import BasmatiRSSFeed from "../components/BasmatiRSSFeed";
-import ProductDetailsPanel from '../pages/ProductDetailsPanel';
 import { useLocation, useNavigate } from "react-router-dom";
 import '../Prod.css';
 
+const ProductDetailsPanel = lazy(() => import('../pages/ProductDetailsPanel'));
+
+
 const AppContent = ({ profile, showWarning, searchQuery }) => {
   const { t } = useLanguage();
+
+
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,6 +35,19 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
   const [showRssFeed, setShowRssFeed] = useState(true);
   const [detailsProduct, setDetailsProduct] = useState(null);
   const productsContainerRef = useRef(null);
+  const [exchangeRates, setExchangeRates] = useState({});
+
+  useEffect(() => {
+    const fetchRates = async () => {
+      const r = ref(db, "exchangeRates/rates");
+      const snap = await get(r);
+      if (snap.exists()) {
+        setExchangeRates(snap.val());
+      }
+    };
+
+    fetchRates();
+  }, []);
 
   // ---------- AUTO‑REOPEN MODAL AFTER SEAFREIGHT (CIF DESTINATION SELECTION) ----------
   useEffect(() => {
@@ -69,7 +86,7 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
       }
     };
     window.addEventListener('storage', handleStorageChange);
-    
+
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [location.pathname]); // Re-run when pathname changes
 
@@ -84,18 +101,33 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
     }
   }, [detailsProduct]);
 
-  // Currency Configuration
-  const currencies = [
-    { code: "INR", symbol: "₹", rate: 1 },
-    { code: "USD", symbol: "$", rate: 1 / 83.5 },
-    { code: "EUR", symbol: "€", rate: 1 / 90.2 },
-    { code: "GBP", symbol: "£", rate: 1 / 108.5 },
-  ];
+  const currencySymbols = {
+    USD: "$",
+    INR: "₹",
+    EUR: "€",
+    GBP: "£",
+    AED: "د.إ",
+  };
 
-  const currentCurrency = currencies.find(c => c.code === currency) || currencies[0];
+  const currentCurrency = {
+    code: currency,
+    symbol: currencySymbols[currency] || "$",
+    rate: exchangeRates[currency] || 1,
+  };
 
   // Helper functions to pass down
-  const getConversionRate = () => currentCurrency.rate;
+  const getConversionRate = () => {
+    if (currency === "INR") return 1;
+
+    if (!exchangeRates.INR) return 1;
+
+    const inrPerUsd = exchangeRates.INR;
+    const targetRate = exchangeRates[currency];
+
+    if (!targetRate) return 1;
+
+    return targetRate / inrPerUsd;
+  };
   const getCurrencySymbol = () => currentCurrency.symbol;
 
   // Fetch products + preserve Firebase key as firebaseId
@@ -180,6 +212,12 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
+  useEffect(() => {
+    if (exchangeRates.USD) {
+      setCurrency("INR"); // default
+    }
+  }, [exchangeRates]);
+
   return (
     <div className="flex flex-1">
       <div className={showRssFeed ? "" : "tw-hidden"}>
@@ -196,18 +234,18 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
             {currentCurrency.symbol} {currentCurrency.code}
           </button>
 
-          {showDropdown && (
+          {showDropdown && Object.keys(exchangeRates).length > 0 && (
             <div className="tw-absolute tw-right-0 tw-mt-2 tw-w-36 tw-bg-black/90 tw-backdrop-blur-xl tw-border tw-border-yellow-400/30 tw-rounded-xl tw-shadow-2xl tw-z-50 tw-py-2">
-              {currencies.map(curr => (
+              {Object.keys(exchangeRates).map((code) => (
                 <button
-                  key={curr.code}
+                  key={code}
                   onClick={() => {
-                    setCurrency(curr.code);
+                    setCurrency(code);
                     setShowDropdown(false);
                   }}
                   className="tw-w-full tw-text-left tw-px-5 tw-py-3 tw-text-sm tw-font-medium tw-text-yellow-200 hover:tw-bg-yellow-400/20"
                 >
-                  {curr.symbol} {curr.code}
+                  {currencySymbols[code]} {code}
                 </button>
               ))}
             </div>
@@ -219,9 +257,8 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
         {/* Sidebar (only visible when no product details are shown) */}
         {!detailsProduct && (
           <div
-            className={`fixed top-[60px] bottom-[64px] transition-all duration-300 ${
-              detailsProduct ? "tw-hidden" : isSidebarOpen ? "w-64" : "w-0"
-            } bg-[#111111] z-40 overflow-hidden`}
+            className={`fixed top-[60px] bottom-[64px] transition-all duration-300 ${detailsProduct ? "tw-hidden" : isSidebarOpen ? "w-64" : "w-0"
+              } bg-[#111111] z-40 overflow-hidden`}
           >
             <Sidebar
               filteredCategory={filteredCategory}
@@ -235,41 +272,42 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
         {/* Main content area */}
         <div
           ref={productsContainerRef}
-          className={`products-container flex-1 transition-all duration-300 p-4 ${
-            detailsProduct
-              ? 'details-open'
-              : isSidebarOpen
+          className={`products-container flex-1 transition-all duration-300 p-4 ${detailsProduct
+            ? 'details-open'
+            : isSidebarOpen
               ? 'sidebar-open'
               : ''
-          }`}
+            }`}
         >
           {detailsProduct ? (
-            <ProductDetailsPanel
-              product={detailsProduct}
-              allProducts={allProducts}
-              profile={profile}
-              onBack={() => {
-                if (location.state?.from === "/products") {
-                  navigate(-1);
-                } else {
-                  setDetailsProduct(null);
-                  setShowRssFeed(true);
-                }
-              }}
-              onEnquire={() => {
-                if (!profile) {
-                  showWarning();
-                  return;
-                }
-                setSelectedProduct(detailsProduct);
-                setIsBuyModalOpen(true);
-              }}
-              onViewDetails={(prod) => {
-                setDetailsProduct(prod);
-              }}
-              getConversionRate={getConversionRate}
-              getCurrencySymbol={getCurrencySymbol}
-            />
+            <Suspense fallback={<div className="tw-text-yellow-400">Loading...</div>}>
+              <ProductDetailsPanel
+                product={detailsProduct}
+                allProducts={allProducts}
+                profile={profile}
+                onBack={() => {
+                  if (location.state?.from === "/products") {
+                    navigate(-1);
+                  } else {
+                    setDetailsProduct(null);
+                    setShowRssFeed(true);
+                  }
+                }}
+                onEnquire={() => {
+                  if (!profile) {
+                    showWarning();
+                    return;
+                  }
+                  setSelectedProduct(detailsProduct);
+                  setIsBuyModalOpen(true);
+                }}
+                onViewDetails={(prod) => {
+                  setDetailsProduct(prod);
+                }}
+                getConversionRate={getConversionRate}
+                getCurrencySymbol={getCurrencySymbol}
+              />
+            </Suspense>
           ) : (
             <ProductsGrid
               products={filteredProducts}

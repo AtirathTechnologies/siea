@@ -1,11 +1,11 @@
 // src/components/Service.jsx
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import MapImage from "../assets/Map.png";
-import Branding from "../assets/Branding-Services.png";
-import Profitable from "../assets/Profitable-Purchase.jpg";
-import Personalization from "../assets/Personalization.jpg";
-import Guidance from "../assets/Guidance.jpg";
-import Quality from "../assets/Quality.jpg";
+import MapImage from "../assets/Map.webp";
+import Branding from "../assets/Branding-Services.webp";
+import Profitable from "../assets/Profitable-Purchase.webp";
+import Personalization from "../assets/Personalization.webp";
+import Guidance from "../assets/Guidance.webp";
+import Quality from "../assets/Quality.webp";
 import { useLanguage } from "../contexts/LanguageContext";
 import { otherServices } from "../data/services";
 import { LazyLoadImage } from 'react-lazy-load-image-component';
@@ -37,10 +37,10 @@ const Service = React.memo(() => {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const serviceFromUrl = searchParams.get('service');
-    
+
     // Also check location state
     const serviceFromState = location.state?.selectedService;
-    
+
     if (serviceFromUrl && otherServices[serviceFromUrl]) {
       setSelectedService(serviceFromUrl);
     } else if (serviceFromState && otherServices[serviceFromState]) {
@@ -115,7 +115,7 @@ const Service = React.memo(() => {
 
                   return (
                     <div
-                      key={vendor.serialNo || vendor.partyName || Math.random()}
+                      key={vendor.serialNo || vendor.partyName}
                       className="tw-relative tw-bg-gray-900 tw-border-2 tw-border-yellow-500 tw-rounded-2xl tw-overflow-hidden tw-shadow-lg tw-flex tw-flex-col tw-h-full"
                       style={{ borderTop: "10px solid #FFD700" }}
                     >

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { ArrowLeftIcon } from '@heroicons/react/24/solid';
-import rice_varities from "../assets/rice_varities.jpg";
-import rice_packing from "../assets/rice_packing.jpg";
-import sella_diff from "../assets/sella_diff.jpg";
-import rice_mills from "../assets/rice_mills.jpg";
-import light_dark from "../assets/light_dark.jpg";
-import diff_raw_steam from "../assets/diff_raw_steam.jpg";
-import mill from "../assets/mill.jpg";
+import rice_varities from "../assets/rice_varities.webp";
+import rice_packing from "../assets/rice_packing.webp";
+import sella_diff from "../assets/sella_diff.webp";
+import rice_mills from "../assets/rice_mills.webp";
+import light_dark from "../assets/light_dark.webp";
+import diff_raw_steam from "../assets/diff_raw_steam.webp";
+import mill from "../assets/mill.webp";
 import { useLanguage } from "../contexts/LanguageContext";
 
 const Blog = () => {

@@ -7,8 +7,10 @@ import { ref, set, runTransaction } from "firebase/database";
 import { useNavigate } from "react-router-dom";
 import { auth, db, deleteUser } from "../firebase";
 import { useLanguage } from "../contexts/LanguageContext";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo.svg";
 import "../Register.css";
+import { Link } from "react-router-dom";
+
 
 export default function Register() {
   const { t } = useLanguage();
@@ -166,8 +168,7 @@ export default function Register() {
 
       // Clear any stored profile data
       localStorage.removeItem("profile");
-      sessionStorage.clear();
-
+      sessionStorage.removeItem("profile");
 
       navigate("/login");
     } catch (err) {
@@ -207,8 +208,9 @@ export default function Register() {
               type="text"
               placeholder={t("full_name_placeholder")}
               value={form.fullName}
-              onChange={e => setForm({ ...form, fullName: e.target.value })}
-              required
+              onChange={e =>
+                setForm(prev => ({ ...prev, fullName: e.target.value }))
+              } required
             />
           </div>
 
@@ -218,7 +220,9 @@ export default function Register() {
               type="email"
               placeholder={t("email_placeholder")}
               value={form.email}
-              onChange={e => setForm({ ...form, email: e.target.value })}
+              onChange={e =>
+                setForm(prev => ({ ...prev, email: e.target.value }))
+              }
               required
             />
           </div>
@@ -371,7 +375,7 @@ export default function Register() {
         {globalErr && <p className="error-text">{globalErr}</p>}
 
         <p className="login-link">
-          {t("already_have_account")} <a href="/login">{t("login")}</a>
+          {t("already_have_account")} <Link to="/login">{t("login")}</Link>
         </p>
       </div>
     </div>

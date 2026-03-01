@@ -1,8 +1,3 @@
-// BuyModal.jsx - COMPLETE with intelligent transport mode filtering, correct bill display,
-// and domestic (India) handling: no port fields, no CIF option, but transport cost is calculated
-// as a fixed amount PER BAG (Road ₹300/bag, Rail ₹250/bag, Air ₹350/bag).
-// International fallback rates: Sea ₹800/ton, Air ₹1500/ton (per ton, as standard).
-
 import React, { useState, useEffect, useRef } from "react";
 import { useLanguage } from "../contexts/LanguageContext";
 import ThankYouPopup from "../components/ThankYouPopup";
@@ -10,6 +5,13 @@ import { submitQuote } from "../firebase";
 import { db } from "../firebase";
 import { ref, onValue } from "firebase/database";
 import { useNavigate } from "react-router-dom";
+import { calculateCIFUSD } from "../utils/pricingUtils";
+import {
+  PACKING_RULES,
+  calculatePackingPrice,
+  isPackingValidForCart,
+  getAvailableQuantities
+} from "../utils/packingUtils";
 
 // Fixed origin port – Mundra
 const ORIGIN_PORT = "Mundra";
@@ -152,7 +154,7 @@ const BuyModal = ({
     { value: "+98", flag: "Iran", name: "Iran", length: 10 },
   ];
 
-  const quantityOptions = ["5kg", "10kg", "25kg", "50kg", "100kg", "1ton"];
+  const ALL_QUANTITIES = [5, 10, 25, 40, 50, 100, 1000];
 
   const currencyOptions = [
     { value: "INR", symbol: "₹" },
@@ -160,14 +162,6 @@ const BuyModal = ({
     { value: "EUR", symbol: "€" },
     { value: "GBP", symbol: "£" },
   ];
-
-  const packingPriceMap = {
-    "PP (Polypropylene Woven Bags)": 43.99,
-    "Non-Woven Bags": 52.79,
-    "Jute Bags": 87.98,
-    "BOPP (Biaxially Oriented Polypropylene) Laminated Bags": 61.59,
-    "LDPE (Low Density Polyethylene) Pouches": 35.19,
-  };
 
   // ---------- Helper: get total bags from cart items ----------
   const getCartTotalBags = () => {
@@ -197,6 +191,8 @@ const BuyModal = ({
       return sum + qtyPerBag * bags;
     }, 0);
   };
+
+
 
 
   // ---------- Fetch product grades (single product only) ----------
@@ -314,70 +310,6 @@ const BuyModal = ({
     return () => unsubscribe();
   }, []);
 
-  // ---------- Packing adjustment factor (for CIF rate) ----------
-  const getPackingAdjustment = (packingOption) => {
-    const packingAdjustments = {
-      "50kg PP": 1.0,
-      "50lbs BOPP": 1.1,
-      "40Kg PP": 0.95,
-      "40kg Non-woven": 1.05,
-      "40kg Jute (Jute Inner)": 1.08,
-      "40kg Jute": 1.07,
-      "39kg Non-woven": 1.03,
-      "39kg BOPP": 1.04,
-      "36kg Non-Woven": 1.02,
-      "35kg Non-Woven": 1.01,
-      "35kg Jute": 1.02,
-      "30kg Non Woven": 0.98,
-      "30kg Jute (Jute inner)": 0.99,
-      "30kg Jute": 0.98,
-      "30kg PP": 0.97,
-      "25kg PP": 0.95,
-      "25kg Non-Woven": 0.96,
-      "25kg Jute": 0.97,
-      "25kg BOPP (Private Label)": 1.15,
-      "25kg BOPP": 1.1,
-      "24.5kg PP": 0.94,
-      "24.5kg Non-Woven": 0.95,
-      "20kg PP": 0.92,
-      "20kg Non-woven": 0.93,
-      "20kg Jute": 0.94,
-      "20kg BOPP (Private Label)": 1.12,
-      "20kg BOPP": 1.08,
-      "17/18Kg Non-woven": 0.9,
-      "4*10kg Non-woven": 1.05,
-      "4*10kg Jute": 1.06,
-      "4*10lbs Non-woven": 1.07,
-      "4*10lbs Jute": 1.08,
-      "4*10Kgs PP": 1.04,
-      "2*10kg Non-woven": 1.02,
-      "2*10kg Jute": 1.03,
-      "2*10kg BOPP with outer (Private Label)": 1.2,
-      "2*10kg BOPP with outer": 1.15,
-      "2*20lbs Non-woven": 1.04,
-      "2*25lbs BOPP": 1.1,
-      "4*5kg Non-woven": 1.08,
-      "4*5kg Jute": 1.09,
-      "4*5kg BOPP with outer (Private Label)": 1.22,
-      "4*5kg Pouch with outer (Private Label)": 1.25,
-      "4*5kg Pouch with carton (Private Label)": 1.3,
-      "4*5kg Pouch with carton": 1.28,
-      "8*5kg Non-woven": 1.12,
-      "8*5kg Jute": 1.13,
-      "8*5Kgs PP": 1.1,
-      "10*4Kgs Non Woven": 1.15,
-      "10*4Kg Non Woven": 1.15,
-      "10*2kg Non Woven": 1.18,
-      "20*1kg Non-woven": 1.25,
-      "20*1kg Jute": 1.26,
-      "20*1kg Pouch with carton (Private Label)": 1.35,
-      "20*1kg Pouch with outer (Private Label)": 1.32,
-      "20*1kg Pouch with carton": 1.3,
-      "One Jumbo liner bag": 0.85,
-    };
-    return packingAdjustments[packingOption] || 1.0;
-  };
-
   // ---------- Calculate CIF price (USD per MT) based on destination, grade, packing, AND transport mode ----------
   useEffect(() => {
     if (!selectedDestination || !selectedDestination.cifUSD || isDomestic) {
@@ -398,11 +330,6 @@ const BuyModal = ({
 
   }, [selectedDestination, currency, exchangeRates, isDomestic]);
 
-  // ---------- Price calculation (ALL PRICES IN INR internally) ----------
-  // Insurance is REMOVED.
-  // - Domestic: freight is a fixed amount PER BAG (no weight dependency).
-  // - International: freight is added only if cif === "Yes". If CIF rate is available, use it per ton;
-  //                  else use international fallback rate per ton.
   useEffect(() => {
 
     if (isCartOrder) {
@@ -413,7 +340,30 @@ const BuyModal = ({
       const totalWeightKg = getCartTotalWeightKg();
       const totalWeightInTons = totalWeightKg / 1000;
 
-      const pPriceINR = packing ? (packingPriceMap[packing] || 0) * totalBags : 0;
+      let pPriceINR = 0;
+
+      cartItems.forEach((item) => {
+        const itemPacking = item.packing;
+        const bags = item.numberOfBags || 1;
+
+        let qtyPerBag = 0;
+
+        if (item.quantityUnit === "1ton") {
+          qtyPerBag = 1000;
+        } else if (item.quantityUnit?.includes("kg")) {
+          qtyPerBag = parseFloat(item.quantityUnit.replace("kg", "")) || 0;
+        }
+
+        if (itemPacking && qtyPerBag > 0) {
+          const itemPackingPrice = calculatePackingPrice(
+            itemPacking,
+            qtyPerBag,
+            bags
+          );
+
+          pPriceINR += itemPackingPrice;
+        }
+      });
       const lPriceINR = 0;
 
       let fPriceINR = 0;
@@ -429,13 +379,14 @@ const BuyModal = ({
 
         if (cif === "Yes") {
 
-          if (selectedDestination && selectedDestination.port && cifPriceUSD > 0) {
+          if (selectedDestination && selectedDestination.port) {
 
-            const cifPriceINR = cifPriceUSD * exchangeRates.USD;
-            fPriceINR = cifPriceINR * totalWeightInTons;
+            const cifUSDPerTon = parseFloat(selectedDestination.cifUSD || 0);
+            const cifINRPerTon = cifUSDPerTon * exchangeRates.USD;
+
+            fPriceINR = cifINRPerTon * totalWeightInTons;
 
             totalINR = cartTotalINR + pPriceINR + fPriceINR;
-
           } else {
 
 
@@ -466,9 +417,12 @@ const BuyModal = ({
       const qtyInQuintals = qtyInKg / 100;
       const qPriceINR = basePricePerQtlINR * qtyInQuintals * numberOfBags;
 
-      const pPriceINR = packing
-        ? (packingPriceMap[packing] || 0) * numberOfBags
-        : 0;
+      const pPriceINR = calculatePackingPrice(
+        packing,
+        qtyInKg,
+        numberOfBags
+      );
+
 
       const lPriceINR = 0;
 
@@ -489,13 +443,25 @@ const BuyModal = ({
 
         if (cif === "Yes") {
 
-          if (selectedDestination && selectedDestination.port && cifPriceUSD > 0) {
+          if (selectedDestination && selectedDestination.port) {
 
-            const cifPriceINR = cifPriceUSD * exchangeRates.USD;
-            fPriceINR = cifPriceINR * totalWeightInTons;
+            const result = calculateCIFUSD(
+              selectedDestination.exMillMin,
+              selectedDestination.exMillMax,
+              exchangeRates.USD,
+              selectedDestination.region,
+              selectedDestination.country,
+              selectedDestination.port
+            );
+
+            // Use MAX to match mobile
+            const cifUSDPerTon = result.cifMaxUSD;
+
+            const cifINRPerTon = cifUSDPerTon * exchangeRates.USD;
+
+            fPriceINR = cifINRPerTon * totalWeightInTons;
 
             totalINR = qPriceINR + pPriceINR + fPriceINR;
-
           } else {
 
 
@@ -645,6 +611,12 @@ const BuyModal = ({
     }
   }, [isOpen]);
 
+
+
+  useEffect(() => {
+    setQuantity("");
+  }, [packing]);
+
   // ---------- Submit handler ----------
   const handleSubmit = async () => {
     if (!fullName || !email || !phoneNumber || !street || !city || !addressState || !addressCountry || !pincode) {
@@ -660,7 +632,7 @@ const BuyModal = ({
     }
 
     if (isCartOrder) {
-      if (!packing || !currency || !customLogo) {
+      if (!currency || !customLogo) {
         alert(t("fill_required_fields"));
         return;
       }
@@ -878,6 +850,8 @@ const BuyModal = ({
 
   const currencySymbol = currencyOptions.find((o) => o.value === currency)?.symbol || "$";
 
+  const availablePackingOptions = Object.keys(PACKING_RULES);
+
   return (
     <div className="buy-modal-overlay">
       <div className="buy-modal-container">
@@ -938,6 +912,11 @@ const BuyModal = ({
                               <div>
                                 <p className="tw-text-yellow-300 tw-font-semibold">{index + 1}. {item.name}</p>
                                 {item.grade && <p className="tw-text-xs tw-text-yellow-200/70">Grade: {item.grade}</p>}
+                                {item.packing && (
+                                  <p className="tw-text-xs tw-text-yellow-200/70">
+                                    Packing: {item.packing}
+                                  </p>
+                                )}
                                 <p className="tw-text-xs tw-text-yellow-200/70">Qty: {item.quantityUnit || `${item.quantity} unit`}</p>
                                 <p className="tw-text-xs tw-text-yellow-200/70">
                                   Units: {item.numberOfBags || 1}
@@ -964,11 +943,43 @@ const BuyModal = ({
                     </>
                   )}
 
-                  <label>{t("packing")} *<select value={packing} onChange={e => setPacking(e.target.value)} required className="select-field"><option value="">{t("select_packing")}</option><option value="PP (Polypropylene Woven Bags)">{t("pp_bags")}</option><option value="Non-Woven Bags">{t("non_woven_bags")}</option><option value="Jute Bags">{t("jute_bags")}</option><option value="BOPP (Biaxially Oriented Polypropylene) Laminated Bags">{t("bopp_bags")}</option><option value="LDPE (Low Density Polyethylene) Pouches">{t("ldpe_pouches")}</option></select></label>
+                  {!isCartOrder && (
+                    <label>{t("packing")} *
+                      <select
+                        value={packing}
+                        onChange={e => setPacking(e.target.value)}
+                        required
+                        className="select-field"
+                      >
+                        <option value="">{t("select_packing")}</option>
+
+                        {availablePackingOptions.map((pack, index) => (
+                          <option key={index} value={pack}>
+                            {pack}
+                          </option>
+                        ))}
+
+                      </select>
+                    </label>
+                  )}
+
 
                   {!isCartOrder && (
                     <>
-                      <label>{t("quantity")} *<select value={quantity} onChange={e => setQuantity(e.target.value)} required className="select-field"><option value="">{t("select_quantity")}</option>{quantityOptions.map((q, i) => <option key={i} value={q}>{q}</option>)}</select></label>
+                      <label>{t("quantity")} *<select
+                        value={quantity}
+                        onChange={e => setQuantity(e.target.value)}
+                        required
+                        className="select-field"
+                      >
+                        <option value="">{t("select_quantity")}</option>
+
+                        {getAvailableQuantities(packing, ALL_QUANTITIES).map((q) => (
+                          <option key={q} value={q === 1000 ? "1ton" : `${q}kg`}>
+                            {q === 1000 ? "1ton" : `${q}kg`}
+                          </option>
+                        ))}
+                      </select></label>
                       <label>{t("number_of_units")} *
                         <div className="tw-flex tw-items-center tw-gap-2"><button type="button" onClick={() => setNumberOfBags(prev => Math.max(1, prev - 1))} className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400 tw-text-black tw-rounded-md hover:tw-bg-yellow-300 tw-font-bold">-</button><input type="number" min="1" max="1000" value={numberOfBags} onChange={e => { const val = parseInt(e.target.value) || 1; setNumberOfBags(Math.max(1, Math.min(1000, val))); }} className="tw-flex-1 tw-text-center tw-bg-black/50 tw-border tw-border-yellow-400/30 tw-rounded tw-p-2 tw-text-white" /><button type="button" onClick={() => setNumberOfBags(prev => Math.min(1000, prev + 1))} className="tw-w-8 tw-h-8 tw-flex tw-items-center tw-justify-center tw-bg-yellow-400 tw-text-black tw-rounded-md hover:tw-bg-yellow-300 tw-font-bold">+</button><span className="tw-ml-2 tw-text-yellow-200">{numberOfBags} {t("units")}</span></div></label>
                     </>
@@ -1138,9 +1149,9 @@ const BuyModal = ({
             </div>
           </div>
         </div>
-      </div>
+      </div >
       <ThankYouPopup isOpen={showThankYou} onClose={() => { setShowThankYou(false); onClose(); }} />
-    </div>
+    </div >
   );
 };
 

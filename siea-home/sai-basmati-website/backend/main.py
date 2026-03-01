@@ -12,17 +12,23 @@ from bs4 import BeautifulSoup
 
 app = FastAPI(title="Agriculture API")
 
+origins = [
+    "http://localhost:5173",   # local frontend
+    "https://saiimportexportagro.com",
+    "https://www.saiimportexportagro.com"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
+) 
 
 
 razorpay_client = razorpay.Client(
-    auth=("rzp_test_SE2aAHPiyM4C8R", "hbXSyV7Nar5ovhrHg17k1WHE")
+    auth=(os.environ["RAZORPAY_KEY_ID"], os.environ["RAZORPAY_KEY_SECRET"])
 )
 
 FOOD_KEYWORDS = [

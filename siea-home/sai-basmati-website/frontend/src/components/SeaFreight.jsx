@@ -65,7 +65,7 @@ const SeaFreight = () => {
         });
 
         return () => unsubscribe();
-    }, [exchangeRates]);
+    }, []);
 
 
     // Transform Firebase data into the structure your component expects
@@ -124,6 +124,10 @@ const SeaFreight = () => {
                     container: container,
                     originPort: item['Origin Port'],
                     grade: item.Grade,
+                    region: region,
+                    country: country,
+                    exMillMin: exMillMin,
+                    exMillMax: exMillMax,
                     cifMin: cifMinUSD,
                     cifMax: cifMaxUSD,
                     cifSingle: item.CIF_USD || 0
@@ -176,14 +180,14 @@ const SeaFreight = () => {
         if (port.cifSingle > 0) {
             cifUSD = parseFloat(port.cifSingle);
         } else if (port.cifMin > 0 && port.cifMax > 0) {
-            cifUSD = (parseFloat(port.cifMin) + parseFloat(port.cifMax)) / 2;
+            cifUSD = parseFloat(port.cifMax);
         }
 
         const destinationData = {
+            ...port,   // store full port object
             region: selectedRegion,
             country: selectedCountry,
             port: port.name,
-            container: port.container || "All Containers",
             cifUSD: cifUSD
         };
 
@@ -663,14 +667,14 @@ const styles = {
 };
 
 // Add CSS animation for the loader
-const styleSheet = document.styleSheets[0];
-if (styleSheet) {
-    styleSheet.insertRule(`
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    `, styleSheet.cssRules.length);
-}
+// const styleSheet = document.styleSheets[0];
+// if (styleSheet) {
+//     styleSheet.insertRule(`
+//         @keyframes spin {
+//             0% { transform: rotate(0deg); }
+//             100% { transform: rotate(360deg); }
+//         }
+//     `, styleSheet.cssRules.length);
+// }
 
 export default SeaFreight;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import logoUrl from '../assets/logo.png';
+import logoUrl from '../assets/logo.svg';
 import { useLanguage } from "../contexts/LanguageContext";
 
 export default function Footer() {
@@ -9,7 +9,7 @@ export default function Footer() {
     <footer id="footer" className="tw-border-t tw-border-yellow-600 tw-bg-black tw-py-4 sm:tw-py-6">
       <div className="tw-w-full tw-px-4 sm:tw-px-6 tw-max-w-7xl tw-mx-auto">
         <div className="tw-flex tw-flex-col tw-items-center md:tw-flex-row md:tw-items-center md:tw-justify-between tw-gap-3 sm:tw-gap-4">
-          <div className="tw-flex tw-flex-col tw-items-center md:tw-flex-row md:tw-items-center tw-gap-3 sm:tw-gap-4">
+          <div className="tw-flex tw-flex-row tw-items-center tw-gap-3 sm:tw-gap-4">
             <img
               src={logoUrl}
               alt={t("company_alt_text")}
@@ -24,7 +24,7 @@ export default function Footer() {
             © {new Date().getFullYear()} {t("company_full_name")}
           </div>
 
-          
+
           <div className="tw-flex tw-items-center tw-gap-3 sm:tw-gap-4 tw-flex-wrap tw-justify-center">
             <a
               href="https://wa.me/918595827184"
@@ -49,25 +49,25 @@ export default function Footer() {
               </svg>
             </a>
             <a
-              href="https://www.linkedin.com/in/ram-sahare-954730281" 
+              href="https://www.linkedin.com/in/ram-sahare-954730281"
               target="_blank"
               rel="noopener noreferrer"
               className="tw-text-yellow-400 hover:tw-text-blue-600 tw-transition-all tw-duration-300 hover:tw-scale-105 md:tw-scale-100 md:hover:tw-scale-105"
               aria-label="LinkedIn"
             >
               <svg className="tw-w-6 tw-h-6 sm:tw-w-7 sm:tw-h-7 md:tw-w-4 md:tw-h-4 lg:tw-w-5 lg:tw-h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-10h3v10zm-1.5-11.375c-.966 0-1.75-.784-1.75-1.75s.784-1.75 1.75-1.75 1.75.784 1.75 1.75-.784 1.75-1.75 1.75zm13.5 11.375h-3v-5.5c0-1.312-.026-3-.011-3.5h-.004c-.016-.25-.051-1.088-.051-1.088h-2.973v5.588h-2.988v-10h2.873v1.375h.041c.396-.75 1.375-1.562 2.836-1.562 3.018 0 3.354 1.938 3.354 4.562v5.625z"/>
+                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-10h3v10zm-1.5-11.375c-.966 0-1.75-.784-1.75-1.75s.784-1.75 1.75-1.75 1.75.784 1.75 1.75-.784 1.75-1.75 1.75zm13.5 11.375h-3v-5.5c0-1.312-.026-3-.011-3.5h-.004c-.016-.25-.051-1.088-.051-1.088h-2.973v5.588h-2.988v-10h2.873v1.375h.041c.396-.75 1.375-1.562 2.836-1.562 3.018 0 3.354 1.938 3.354 4.562v5.625z" />
               </svg>
             </a>
             <a
-              href="https://t.me/SAIEXPORTANDIMPORt" 
+              href="https://t.me/SAIEXPORTANDIMPORt"
               target="_blank"
               rel="noopener noreferrer"
               className="tw-text-yellow-400 hover:tw-text-sky-500 tw-transition-all tw-duration-300 hover:tw-scale-105 md:tw-scale-100 md:hover:tw-scale-105"
               aria-label="Telegram"
             >
               <svg className="tw-w-6 tw-h-6 sm:tw-w-7 sm:tw-h-7 md:tw-w-4 md:tw-h-4 lg:tw-w-5 lg:tw-h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 11.944 0zm4.95 8.77l-1.607 7.575c-.12.54-.44.67-.9.42l-2.45-1.8-1.18.95c-.13.13-.24.24-.49.24l.17-2.46 4.42-4c.19-.17-.04-.27-.29-.11l-5.46 3.43-2.1-.65c-.46-.14-.47-.52.1-.74l8.71-3.35c.38-.14.72.09.63.57z"/>
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 11.944 0zm4.95 8.77l-1.607 7.575c-.12.54-.44.67-.9.42l-2.45-1.8-1.18.95c-.13.13-.24.24-.49.24l.17-2.46 4.42-4c.19-.17-.04-.27-.29-.11l-5.46 3.43-2.1-.65c-.46-.14-.47-.52.1-.74l8.71-3.35c.38-.14.72.09.63.57z" />
               </svg>
             </a>
             <a
@@ -78,19 +78,19 @@ export default function Footer() {
               aria-label="YouTube"
             >
               <svg className="tw-w-6 tw-h-6 sm:tw-w-7 sm:tw-h-7 md:tw-w-4 md:tw-h-4 lg:tw-w-5 lg:tw-h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.016 3.016 0 0 0 .502 6.186 31.88 31.88 0 0 0 0 12.005c0 1.97.502 3.94.502 5.908a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.016 3.016 0 0 0 2.122-2.136C24 16.945 24 12.005 24 12.005s0-3.94-.502-5.819zM9.75 15.569V8.431l6.264 3.569-6.264 3.569z"/>
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.016 3.016 0 0 0 .502 6.186 31.88 31.88 0 0 0 0 12.005c0 1.97.502 3.94.502 5.908a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.016 3.016 0 0 0 2.122-2.136C24 16.945 24 12.005 24 12.005s0-3.94-.502-5.819zM9.75 15.569V8.431l6.264 3.569-6.264 3.569z" />
               </svg>
             </a>
 
             <a
-              href="https://www.facebook.com/saiimportexport8859" 
+              href="https://www.facebook.com/saiimportexport8859"
               target="_blank"
               rel="noopener noreferrer"
               className="tw-text-yellow-400 hover:tw-text-blue-700 tw-transition-all tw-duration-300 hover:tw-scale-105 md:tw-scale-100 md:hover:tw-scale-105"
               aria-label="Facebook"
             >
               <svg className="tw-w-6 tw-h-6 sm:tw-w-7 sm:tw-h-7 md:tw-w-4 md:tw-h-4 lg:tw-w-5 lg:tw-h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
             </a>
           </div>

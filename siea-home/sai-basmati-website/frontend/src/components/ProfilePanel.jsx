@@ -757,12 +757,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
           )}
         </div>
 
-        {/* Footer */}
-        <div className="tw-p-4 tw-border-t tw-border-gray-700/50 tw-bg-gray-800/30">
-          <p className="tw-text-xs tw-text-center tw-text-gray-400">
-            SIEA Rice Exports • © {new Date().getFullYear()}
-          </p>
-        </div>
+        
       </aside>
 
       {/* My Orders Popup */}

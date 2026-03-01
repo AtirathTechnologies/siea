@@ -1,9 +1,80 @@
 // Prices.jsx - COMPLETE (modified handleSelectDestination)
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { db } from "../firebase";
 import { ref, onValue } from "firebase/database";
 import { useNavigate } from "react-router-dom";
 import { calculateCIFUSD } from "../utils/pricingUtils";
+
+
+
+// Basmati rice names
+const basmatiRiceNames = ["1121", "1509", "1401", "1718", "pusa", "basmati"];
+
+// Non-basmati rice names
+const nonBasmatiRiceNames = [
+  "sugandha", "sharbati", "pr-11", "pr-14", "pr-06", "pr-47", "rh-10",
+  "sona masoori", "long grain", "ir-8", "gr-11", "swarna", "kalizeera", "ponni"
+];
+
+const packingAdjustments = {
+  "50kg PP": 1.0,
+  "50lbs BOPP": 1.1,
+  "40Kg PP": 0.95,
+  "40kg Non-woven": 1.05,
+  "40kg Jute (Jute Inner)": 1.08,
+  "40kg Jute": 1.07,
+  "39kg Non-woven": 1.03,
+  "39kg BOPP": 1.04,
+  "36kg Non-Woven": 1.02,
+  "35kg Non-Woven": 1.01,
+  "35kg Jute": 1.02,
+  "30kg Non Woven": 0.98,
+  "30kg Jute (Jute inner)": 0.99,
+  "30kg Jute": 0.98,
+  "30kg PP": 0.97,
+  "25kg PP": 0.95,
+  "25kg Non-Woven": 0.96,
+  "25kg Jute": 0.97,
+  "25kg BOPP (Private Label)": 1.15,
+  "25kg BOPP": 1.1,
+  "24.5kg PP": 0.94,
+  "24.5kg Non-Woven": 0.95,
+  "20kg PP": 0.92,
+  "20kg Non-woven": 0.93,
+  "20kg Jute": 0.94,
+  "20kg BOPP (Private Label)": 1.12,
+  "20kg BOPP": 1.08,
+  "17/18Kg Non-woven": 0.9,
+  "4*10kg Non-woven": 1.05,
+  "4*10kg Jute": 1.06,
+  "4*10lbs Non-woven": 1.07,
+  "4*10lbs Jute": 1.08,
+  "4*10Kgs PP": 1.04,
+  "2*10kg Non-woven": 1.02,
+  "2*10kg Jute": 1.03,
+  "2*10kg BOPP with outer (Private Label)": 1.2,
+  "2*10kg BOPP with outer": 1.15,
+  "2*20lbs Non-woven": 1.04,
+  "2*25lbs BOPP": 1.1,
+  "4*5kg Non-woven": 1.08,
+  "4*5kg Jute": 1.09,
+  "4*5kg BOPP with outer (Private Label)": 1.22,
+  "4*5kg Pouch with outer (Private Label)": 1.25,
+  "4*5kg Pouch with carton (Private Label)": 1.3,
+  "4*5kg Pouch with carton": 1.28,
+  "8*5kg Non-woven": 1.12,
+  "8*5kg Jute": 1.13,
+  "8*5Kgs PP": 1.1,
+  "10*4Kgs Non Woven": 1.15,
+  "10*4Kg Non Woven": 1.15,
+  "10*2kg Non Woven": 1.18,
+  "20*1kg Non-woven": 1.25,
+  "20*1kg Jute": 1.26,
+  "20*1kg Pouch with carton (Private Label)": 1.35,
+  "20*1kg Pouch with outer (Private Label)": 1.32,
+  "20*1kg Pouch with carton": 1.3,
+  "One Jumbo liner bag": 0.85
+};
 
 
 const Prices = () => {
@@ -128,14 +199,7 @@ const Prices = () => {
     localStorage.setItem('selectedPacking', packing);
   }, [packing]);
 
-  // Basmati rice names
-  const basmatiRiceNames = ["1121", "1509", "1401", "1718", "pusa", "basmati"];
 
-  // Non-basmati rice names
-  const nonBasmatiRiceNames = [
-    "sugandha", "sharbati", "pr-11", "pr-14", "pr-06", "pr-47", "rh-10",
-    "sona masoori", "long grain", "ir-8", "gr-11", "swarna", "kalizeera", "ponni"
-  ];
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -173,73 +237,90 @@ const Prices = () => {
   useEffect(() => {
     const ratesRef = ref(db, "exchangeRates/rates");
 
-    onValue(ratesRef, (snapshot) => {
+    const unsubscribe = onValue(ratesRef, (snapshot) => {
       if (snapshot.exists()) {
         setExchangeRates(snapshot.val());
-        console.log("Exchange rates loaded from Firebase:", snapshot.val());
       }
     });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const styleSheet = document.styleSheets[0];
+    if (!styleSheet) return;
+
+    const alreadyExists = Array.from(styleSheet.cssRules).some(rule =>
+      rule.name === "spin"
+    );
+
+    if (!alreadyExists) {
+      styleSheet.insertRule(`
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `, styleSheet.cssRules.length);
+    }
   }, []);
 
   // Fetch data based on selected currency
   useEffect(() => {
     setLoading(true);
 
+    let unsubscribe;
+
     if (currency === "INR") {
       const marketRatesRef = ref(db, "market_rates/");
-      console.log("Fetching INR data from market_rates");
 
-      onValue(marketRatesRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const allData = snapshot.val();
-          console.log("Fetched market_rates data:", allData);
-          setMarketRatesData(allData);
-          setCifRatesData([]);
+      unsubscribe = onValue(
+        marketRatesRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const allData = snapshot.val();
+            setMarketRatesData(allData);
+            setCifRatesData([]);
 
-          const states = Object.keys(allData);
-          if (states.length > 0) {
-            setSelectedState(states[0]);
+            const states = Object.keys(allData);
+            if (states.length > 0) {
+              setSelectedState(states[0]);
+            }
+          } else {
+            setMarketRatesData({});
+            setSelectedState("");
           }
-        } else {
-          console.log("No market_rates data found");
-          setMarketRatesData({});
-          setSelectedState("");
-        }
-        setLoading(false);
-      }, (error) => {
-        console.error("Market rates error:", error);
-        setLoading(false);
-      });
+          setLoading(false);
+        },
+        () => setLoading(false)
+      );
     } else {
       const cifRatesRef = ref(db, "cifRates/");
-      console.log(`Fetching ${currency} data from cifRates`);
 
-      onValue(cifRatesRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const cifData = snapshot.val();
-          console.log("Fetched cifRates data:", cifData);
+      unsubscribe = onValue(
+        cifRatesRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const cifData = snapshot.val();
+            const dataArray = Array.isArray(cifData)
+              ? cifData
+              : Object.values(cifData);
 
-          let dataArray = [];
-          if (Array.isArray(cifData)) {
-            dataArray = cifData;
-          } else if (typeof cifData === 'object') {
-            dataArray = Object.values(cifData);
+            setCifRatesData(dataArray);
+            setMarketRatesData({});
+          } else {
+            setCifRatesData([]);
           }
-
-          console.log(`Processed ${dataArray.length} CIF records`);
-          setCifRatesData(dataArray);
-          setMarketRatesData({});
-        } else {
-          console.log("No cifRates data found");
-          setCifRatesData([]);
-        }
-        setLoading(false);
-      }, (error) => {
-        console.error("CIF rates error:", error);
-        setLoading(false);
-      });
+          setLoading(false);
+        },
+        () => setLoading(false)
+      );
     }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [currency]);
+
 
   // --- MODIFIED: navigate to SeaFreight with proper return URL ---
   const handleSelectDestination = () => {
@@ -286,7 +367,7 @@ const Prices = () => {
       .split("-")
       .map((n) => parseFloat(n.trim()));
 
-    const rate = exchangeRates[currency] / exchangeRates.INR;
+    const rate = (exchangeRates[currency] || 1) / (exchangeRates.INR || 1);
 
     return `${symbols[currency]}${(low * rate).toFixed(2)} - ${symbols[currency]}${(high * rate).toFixed(2)}`;
   };
@@ -308,88 +389,27 @@ const Prices = () => {
     }
 
     // Now convert USD to selected currency
-    const finalValue = valueInUSD * exchangeRates[currency];
-
+    const finalValue = valueInUSD * (exchangeRates[currency] || 1);
     return finalValue.toFixed(2);
   };
 
+
   // Get price adjustment factor based on packing
   const getPackingAdjustment = (packingOption) => {
-    const packingAdjustments = {
-      "50kg PP": 1.0,
-      "50lbs BOPP": 1.1,
-      "40Kg PP": 0.95,
-      "40kg Non-woven": 1.05,
-      "40kg Jute (Jute Inner)": 1.08,
-      "40kg Jute": 1.07,
-      "39kg Non-woven": 1.03,
-      "39kg BOPP": 1.04,
-      "36kg Non-Woven": 1.02,
-      "35kg Non-Woven": 1.01,
-      "35kg Jute": 1.02,
-      "30kg Non Woven": 0.98,
-      "30kg Jute (Jute inner)": 0.99,
-      "30kg Jute": 0.98,
-      "30kg PP": 0.97,
-      "25kg PP": 0.95,
-      "25kg Non-Woven": 0.96,
-      "25kg Jute": 0.97,
-      "25kg BOPP (Private Label)": 1.15,
-      "25kg BOPP": 1.1,
-      "24.5kg PP": 0.94,
-      "24.5kg Non-Woven": 0.95,
-      "20kg PP": 0.92,
-      "20kg Non-woven": 0.93,
-      "20kg Jute": 0.94,
-      "20kg BOPP (Private Label)": 1.12,
-      "20kg BOPP": 1.08,
-      "17/18Kg Non-woven": 0.9,
-      "4*10kg Non-woven": 1.05,
-      "4*10kg Jute": 1.06,
-      "4*10lbs Non-woven": 1.07,
-      "4*10lbs Jute": 1.08,
-      "4*10Kgs PP": 1.04,
-      "2*10kg Non-woven": 1.02,
-      "2*10kg Jute": 1.03,
-      "2*10kg BOPP with outer (Private Label)": 1.2,
-      "2*10kg BOPP with outer": 1.15,
-      "2*20lbs Non-woven": 1.04,
-      "2*25lbs BOPP": 1.1,
-      "4*5kg Non-woven": 1.08,
-      "4*5kg Jute": 1.09,
-      "4*5kg BOPP with outer (Private Label)": 1.22,
-      "4*5kg Pouch with outer (Private Label)": 1.25,
-      "4*5kg Pouch with carton (Private Label)": 1.3,
-      "4*5kg Pouch with carton": 1.28,
-      "8*5kg Non-woven": 1.12,
-      "8*5kg Jute": 1.13,
-      "8*5Kgs PP": 1.1,
-      "10*4Kgs Non Woven": 1.15,
-      "10*4Kg Non Woven": 1.15,
-      "10*2kg Non Woven": 1.18,
-      "20*1kg Non-woven": 1.25,
-      "20*1kg Jute": 1.26,
-      "20*1kg Pouch with carton (Private Label)": 1.35,
-      "20*1kg Pouch with outer (Private Label)": 1.32,
-      "20*1kg Pouch with carton": 1.3,
-      "One Jumbo liner bag": 0.85
-    };
 
     return packingAdjustments[packingOption] || 1.0;
   };
 
-  // Process CIF data into organized structure by rice type
-  const processCifData = () => {
+  /* ---------------- OPTIMIZED BASE PROCESSING (HEAVY WORK ONCE) ---------------- */
+
+  const baseProcessedData = useMemo(() => {
     if (!Array.isArray(cifRatesData) || cifRatesData.length === 0) {
-      return { basmati: [], nonBasmati: [] };
+      return [];
     }
 
-    const basmatiItems = [];
-    const nonBasmatiItems = [];
-    const groupedByGrade = {};
+    const grouped = {};
 
-    cifRatesData.forEach((item, dataIndex) => {
-
+    cifRatesData.forEach((item) => {
       const grade = item.Grade || "Unknown";
       const gradeLower = grade.toLowerCase();
 
@@ -397,24 +417,14 @@ const Prices = () => {
         gradeLower.includes(name)
       );
 
-      if (!groupedByGrade[grade]) {
-        groupedByGrade[grade] = {
+      if (!grouped[grade]) {
+        grouped[grade] = {
           grade,
           isBasmati,
           items: []
         };
       }
 
-      // -------- BASIC INFO FIRST (IMPORTANT ORDER) --------
-      const container = item.Container || "20' Container";
-      const destinationPort = item["Destination Port"] || "Jebel Ali";
-      const country = item.Country || "UAE";
-      const region = item.Region || "Middle East";
-
-      const countryLower = (country || "").toLowerCase().trim();
-      const portLower = (destinationPort || "").toLowerCase().trim();
-
-      // -------- EX-MILL --------
       const exMillMin = parseFloat(item.Ex_Mill_Min || 0);
       const exMillMax = parseFloat(item.Ex_Mill_Max || 0);
 
@@ -427,73 +437,109 @@ const Prices = () => {
         exMillMin,
         exMillMax,
         exchangeRates.INR,
-        region,
-        country,
-        destinationPort
+        item.Region,
+        item.Country,
+        item["Destination Port"]
       );
 
+      grouped[grade].items.push({
+        ...item,
+        rawFobMinUSD: fobMinUSD,
+        rawFobMaxUSD: fobMaxUSD,
+        rawCifMinUSD: cifMinUSD,
+        rawCifMaxUSD: cifMaxUSD
+      });
+    });
 
+    return Object.values(grouped);
 
+  }, [cifRatesData, exchangeRates.INR]);
 
-      const matchesPort =
-        selectedCifDestination.port === "All Ports" ||
-        destinationPort === selectedCifDestination.port;
+  /* ---------------- LIGHTWEIGHT DISPLAY PROCESSING ---------------- */
 
-      const matchesContainer =
-        selectedCifDestination.container === "All Containers" ||
-        container === selectedCifDestination.container;
+  const processedCifData = useMemo(() => {
 
-      if (matchesPort && matchesContainer) {
+    if (currency === "INR") {
+      return { basmati: [], nonBasmati: [] };
+    }
 
-        const packingAdjustment = getPackingAdjustment(packing);
+    const packingAdjustment = getPackingAdjustment(packing);
 
-        const adjustedFobMin = fobMinUSD * packingAdjustment;
-        const adjustedFobMax = fobMaxUSD * packingAdjustment;
+    const basmati = [];
+    const nonBasmati = [];
 
-        const adjustedCifMin = cifMinUSD * packingAdjustment;
-        const adjustedCifMax = cifMaxUSD * packingAdjustment;
+    baseProcessedData.forEach(group => {
 
-        const fobMinPrice = convertSinglePrice(adjustedFobMin, "USD");
-        const fobMaxPrice = convertSinglePrice(adjustedFobMax, "USD");
+      const filteredItems = group.items
+        .filter(item => {
 
-        const cifMinPrice = convertSinglePrice(adjustedCifMin, "USD");
-        const cifMaxPrice = convertSinglePrice(adjustedCifMax, "USD");
+          const matchesPort =
+            selectedCifDestination.port === "All Ports" ||
+            item["Destination Port"] === selectedCifDestination.port;
 
-        const fobPriceStr =
-          fobMinPrice === fobMaxPrice
-            ? fobMinPrice
-            : `${fobMinPrice}-${fobMaxPrice}`;
+          const matchesContainer =
+            selectedCifDestination.container === "All Containers" ||
+            item.Container === selectedCifDestination.container;
 
-        const cifPriceStr =
-          cifMinPrice === cifMaxPrice
-            ? cifMinPrice
-            : `${cifMinPrice}-${cifMaxPrice}`;
+          return matchesPort && matchesContainer;
+        })
+        .map(item => {
 
-        groupedByGrade[grade].items.push({
-          type: grade,
-          destinationPort,
-          country,
-          region,
-          container,
-          originPort: item["Origin Port"] || "Mundra",
-          fobPrice: fobPriceStr,
-          cifPrice: cifPriceStr,
-          packing,
-          dataIndex
+          const adjustedFobMin = item.rawFobMinUSD * packingAdjustment;
+          const adjustedFobMax = item.rawFobMaxUSD * packingAdjustment;
+          const adjustedCifMin = item.rawCifMinUSD * packingAdjustment;
+          const adjustedCifMax = item.rawCifMaxUSD * packingAdjustment;
+
+          const fobMinPrice = convertSinglePrice(adjustedFobMin, "USD");
+          const fobMaxPrice = convertSinglePrice(adjustedFobMax, "USD");
+          const cifMinPrice = convertSinglePrice(adjustedCifMin, "USD");
+          const cifMaxPrice = convertSinglePrice(adjustedCifMax, "USD");
+
+          return {
+            ...item,
+            fobPrice:
+              fobMinPrice === fobMaxPrice
+                ? fobMinPrice
+                : `${fobMinPrice}-${fobMaxPrice}`,
+            cifPrice:
+              cifMinPrice === cifMaxPrice
+                ? cifMinPrice
+                : `${cifMinPrice}-${cifMaxPrice}`
+          };
         });
+
+      if (filteredItems.length > 0) {
+        if (group.isBasmati) {
+          basmati.push({ ...group, items: filteredItems });
+        } else {
+          nonBasmati.push({ ...group, items: filteredItems });
+        }
       }
+
     });
 
-    Object.values(groupedByGrade).forEach(group => {
-      if (group.items.length > 0) {
-        if (group.isBasmati) basmatiItems.push(group);
-        else nonBasmatiItems.push(group);
-      }
-    });
+    return { basmati, nonBasmati };
 
-    return { basmati: basmatiItems, nonBasmati: nonBasmatiItems };
-  };
+  }, [
+    currency,
+    packing,
+    selectedCifDestination,
+    exchangeRates,
+    baseProcessedData
+  ]);
 
+  const [isMobile, setIsMobile] = useState(
+    window.innerWidth < 640
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
 
   if (loading) {
@@ -506,9 +552,6 @@ const Prices = () => {
   }
 
   const states = Object.keys(marketRatesData);
-  const isMobile = window.innerWidth < 640;
-
-  const processedCifData = currency !== "INR" ? processCifData() : { basmati: [], nonBasmati: [] };
 
   const getCurrencySymbol = () => {
     const symbols = {
@@ -1394,40 +1437,5 @@ const styles = {
   },
 };
 
-// Add CSS animation for the loader
-const styleSheet = document.styleSheets[0];
-if (styleSheet) {
-  styleSheet.insertRule(`
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  `, styleSheet.cssRules.length);
-
-  styleSheet.insertRule(`
-    .packing-option:hover {
-      background: #FFD700 !important;
-      color: #000 !important;
-    }
-  `, styleSheet.cssRules.length);
-
-  styleSheet.insertRule(`
-    .packing-header:hover {
-      background: rgba(255, 215, 0, 0.1) !important;
-    }
-  `, styleSheet.cssRules.length);
-
-  styleSheet.insertRule(`
-    .cif-dropdown-arrow:hover {
-      transform: scale(1.2) !important;
-    }
-  `, styleSheet.cssRules.length);
-
-  styleSheet.insertRule(`
-    .change-destination-button:hover {
-      background: #1976D2 !important;
-    }
-  `, styleSheet.cssRules.length);
-}
 
 export default Prices;

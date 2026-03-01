@@ -7,10 +7,19 @@ const GoldenRiceAnimation = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    let animationId;
+    let hue = 45;
 
-    let hue = 45; 
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    resizeCanvas();
+
+    // Adjust particle count based on screen size
+    const particleCount =
+      window.innerWidth < 768 ? 80 : 140; // mobile less, desktop more
 
     class Particle {
       constructor() {
@@ -20,12 +29,12 @@ const GoldenRiceAnimation = () => {
       reset() {
         this.x = Math.random() * canvas.width;
         this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 7 + 5; // 5 → 12px rice
-        this.speedX = Math.random() * 0.8 + 0.3;
-        this.speedY = Math.random() * 0.4 - 0.2;
-        this.alpha = Math.random() * 0.6 + 0.4;
+        this.size = Math.random() * 6 + 4;
+        this.speedX = Math.random() * 0.6 + 0.2;
+        this.speedY = Math.random() * 0.3 - 0.15;
+        this.alpha = Math.random() * 0.5 + 0.5;
         this.rotation = Math.random() * Math.PI * 2;
-        this.rotationSpeed = (Math.random() - 0.5) * 0.01;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.008;
       }
 
       update() {
@@ -34,9 +43,9 @@ const GoldenRiceAnimation = () => {
         this.rotation += this.rotationSpeed;
 
         if (
-          this.x > canvas.width + 50 ||
-          this.y < -50 ||
-          this.y > canvas.height + 50
+          this.x > canvas.width + 40 ||
+          this.y < -40 ||
+          this.y > canvas.height + 40
         ) {
           this.reset();
           this.x = -20;
@@ -48,10 +57,9 @@ const GoldenRiceAnimation = () => {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotation);
 
-        
         ctx.fillStyle = `hsla(${hue}, 90%, 55%, ${this.alpha})`;
         ctx.shadowColor = `hsla(${hue}, 100%, 60%, 1)`;
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 10;
 
         ctx.beginPath();
         ctx.ellipse(
@@ -70,21 +78,31 @@ const GoldenRiceAnimation = () => {
     }
 
     const particles = [];
-    for (let i = 0; i < 300; i++) particles.push(new Particle());
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle());
+    }
 
-    function drawBackground() {
-      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    // Create gradient only once
+    const createBackground = () => {
+      const gradient = ctx.createLinearGradient(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
       gradient.addColorStop(0, "#000000");
       gradient.addColorStop(0.5, "#111111");
       gradient.addColorStop(1, "#000000");
-      ctx.fillStyle = gradient;
+      return gradient;
+    };
+
+    let background = createBackground();
+
+    const animate = () => {
+      ctx.fillStyle = background;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
 
-    function animate() {
-      drawBackground();
-
-      hue += 0.3;
+      hue += 0.2;
       if (hue > 55) hue = 45;
 
       particles.forEach((p) => {
@@ -92,26 +110,35 @@ const GoldenRiceAnimation = () => {
         p.draw();
       });
 
-      requestAnimationFrame(animate);
-    }
+      animationId = requestAnimationFrame(animate);
+    };
 
     animate();
 
     const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      resizeCanvas();
+      background = createBackground();
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animationId);
+      } else {
+        animate();
+      }
     };
 
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="block w-full h-full"
-    />
-  );
+  return <canvas ref={canvasRef} className="block w-full h-full" />;
 };
 
 export default GoldenRiceAnimation;

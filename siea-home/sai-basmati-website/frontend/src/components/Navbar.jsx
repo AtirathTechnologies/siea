@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import logoUrl from "../assets/logo.png";
+import logoUrl from "../assets/logo.svg";
 import { useLanguage } from "../contexts/LanguageContext";
 import { otherServices } from "../data/services";
 

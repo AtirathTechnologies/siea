@@ -72,8 +72,17 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const removeFromCart = (itemId) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  const removeFromCart = (itemId, grade, packing, quantityUnit) => {
+    setCartItems(prevItems =>
+      prevItems.filter(item =>
+        !(
+          item.id === itemId &&
+          item.grade === grade &&
+          item.packing === packing &&
+          item.quantityUnit === quantityUnit
+        )
+      )
+    );
   };
 
   const updateQuantity = (itemId, newQuantity) => {

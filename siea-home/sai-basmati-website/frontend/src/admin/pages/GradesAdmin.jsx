@@ -62,6 +62,7 @@ export default function GradesAdmin() {
     onValue(r, (snap) => {
       if (snap.exists()) setGrades(snap.val());
     });
+    return () => unsubscribe();
   }, []);
 
   // --- Editing Handlers ---

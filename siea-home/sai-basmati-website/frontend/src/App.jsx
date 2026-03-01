@@ -1,46 +1,50 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { CartProvider } from "./contexts/CartContext.jsx";
 import Navbar from "./components/Navbar";
 import NavbarProd from "./components/NavbarProd";
 import Footer from "./components/Footer";
-import Home from "./pages/Home";
-import Products from "./pages/Products";
-import Prices from "./pages/Prices";
-import About from "./pages/About";
 import GoldenRiceAnimation from "./components/GoldenRiceAnimation";
-import Logo from "./assets/logo.png";
-import Register from "./components/Register";
-import Login from "./components/Login";
-import ProductApp from "./components/ProductApp";
+import Logo from "./assets/logo.svg";
 import ProfilePanel from "./components/ProfilePanel";
-import Feedback from "./pages/Feedback";
-import Contact from "./components/Contact";
-import Service from "./components/Service";
-import Blog from "./components/Blog";
-import Transport from "./components/Transport";
-import ForgotPassword from "./components/ForgotPassword";
-import SeaFreight from "./components/SeaFreight";
-import JoinUs from "./pages/JoinUs";
 import ProtectedAdminRoute from "./admin/ProtectedAdminRoute";
 import AdminLayout from "./admin/AdminLayout";
-import Users from "./admin/pages/Users";
-import ProductsAdmin from "./admin/pages/Products";
-import Orders from "./admin/pages/Orders";
-import Services from "./admin/pages/Services";
-import Dashboard from "./admin/pages/Dashboard";
-import PendingQuotes from "./admin/pages/PendingQuotes";
-import TodaysOrders from "./admin/pages/TodaysOrders";
 import AdminMarketPrices from "./admin/AdminMarketPrices";
-import History from "./admin/pages/History";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { ref, onValue, off } from "firebase/database";
-import SampleCourierService from "./components/SampleCourierService";
-import { CartProvider } from "./contexts/CartContext.jsx";
-import Cart from "./pages/Cart.jsx";
-import CIFRatesAdmin from "./admin/pages/CIFRatesAdmin.jsx";
-import ExchangeRatesAdmin from "./admin/pages/ExchangeRatesAdmin.jsx";
+const Home = lazy(() => import("./pages/Home"));
+const Products = lazy(() => import("./pages/Products"));
+const Prices = lazy(() => import("./pages/Prices"));
+const About = lazy(() => import("./pages/About"));
+const Feedback = lazy(() => import("./pages/Feedback"));
+const JoinUs = lazy(() => import("./pages/JoinUs"));
+const Cart = lazy(() => import("./pages/Cart.jsx"));
+const Register = lazy(() => import("./components/Register"));
+const Login = lazy(() => import("./components/Login"));
+const ProductApp = lazy(() => import("./components/ProductApp"));
+const Contact = lazy(() => import("./components/Contact"));
+const Service = lazy(() => import("./components/Service"));
+const Blog = lazy(() => import("./components/Blog"));
+const Transport = lazy(() => import("./components/Transport"));
+const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
+const SeaFreight = lazy(() => import("./components/SeaFreight"));
+const SampleCourierService = lazy(() => import("./components/SampleCourierService"));
+const Dashboard = lazy(() => import("./admin/pages/Dashboard"));
+const Users = lazy(() => import("./admin/pages/Users"));
+const ProductsAdmin = lazy(() => import("./admin/pages/Products"));
+const Orders = lazy(() => import("./admin/pages/Orders"));
+const Services = lazy(() => import("./admin/pages/Services"));
+const PendingQuotes = lazy(() => import("./admin/pages/PendingQuotes"));
+const TodaysOrders = lazy(() => import("./admin/pages/TodaysOrders"));
+const History = lazy(() => import("./admin/pages/History"));
+const CIFRatesAdmin = lazy(() => import("./admin/pages/CIFRatesAdmin.jsx"));
+const ExchangeRatesAdmin = lazy(() => import("./admin/pages/ExchangeRatesAdmin.jsx"));
+
+
+
+
 
 function ScrollToHash() {
   const location = useLocation();
@@ -155,14 +159,19 @@ export default function App() {
             });
 
             if (userData) {
-              console.log("Found user in database:", {
-                name: userData.fullName,
-                hasAvatar: !!userData.avatar,
-                avatarLength: userData.avatar?.length
-              });
-
               setProfile(userData);
               localStorage.setItem("profile", JSON.stringify(userData));
+
+              // 🔥 Check Admin from "admins" node
+              const adminRef = ref(db, "admins/" + user.uid);
+
+              onValue(adminRef, (adminSnap) => {
+                const isAdminUser = adminSnap.exists();
+
+                if (isAdminUser && !location.pathname.startsWith("/admin")) {
+                  navigate("/admin/dashboard", { replace: true });
+                }
+              }, { onlyOnce: true });
             } else if (user.email === "admin@gmail.com") {
               console.log("Setting default admin profile");
               const defaultProfile = {
@@ -211,7 +220,7 @@ export default function App() {
         dbListenerUnsubscribe();
       }
     };
-  }, []);
+  }, [navigate, location.pathname]);
 
   // Load profile from localStorage on mount
   useEffect(() => {
@@ -259,7 +268,7 @@ export default function App() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
@@ -298,7 +307,7 @@ export default function App() {
     sessionStorage.clear();
 
     // Clear cookies
-    document.cookie.split(";").forEach(function(c) {
+    document.cookie.split(";").forEach(function (c) {
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
 
@@ -419,46 +428,52 @@ export default function App() {
             )}
             <ScrollToHash />
             <main className={`tw-flex-1 ${isProductsPage && !isAdminDashboard ? "tw-pt-[60px]" : ""}`}>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/market-rates" element={<Prices />} />
-                <Route path="/feedback" element={<Feedback />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/Products-All" element={<ProductApp profile={profile} setProfile={setProfile} showWarning={showWarning} searchQuery={searchQuery} />} />
-                <Route path="/register" element={<Register setProfile={setProfile} />} />
-                <Route path="/login" element={<Login setProfile={setProfile} />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/service" element={<Service />} />
-                <Route path="/sample-courier" element={<SampleCourierService />} />
-                <Route path="/blog" element={<Blog />} />
-                <Route path="/transport" element={<Transport />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/sea-freight" element={<SeaFreight />} />
-                <Route path="/join-us" element={<JoinUs />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route
-                  path="/admin/*"
-                  element={
-                    <ProtectedAdminRoute>
-                      <AdminLayout handleLogout={handleLogout} />
-                    </ProtectedAdminRoute>
-                  }
-                >
-                  <Route index element={<Dashboard />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="products" element={<ProductsAdmin />} />
-                  <Route path="market-prices" element={<AdminMarketPrices />} />
-                  <Route path="exchange-rates" element={<ExchangeRatesAdmin/>} />
-                  <Route path="cif-rates" element={<CIFRatesAdmin />} />
-                  <Route path="orders" element={<Orders />} />
-                  <Route path="services" element={<Services />} />
-                  <Route path="pending-quotes" element={<PendingQuotes />} />
-                  <Route path="todays-orders" element={<TodaysOrders />} />
-                  <Route path="history" element={<History />} />
-                </Route>
-              </Routes>
+              <Suspense fallback={
+                <div className="tw-flex tw-justify-center tw-items-center tw-h-40">
+                  <div className="tw-text-yellow-400">Loading Page...</div>
+                </div>
+              }>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/market-rates" element={<Prices />} />
+                  <Route path="/feedback" element={<Feedback />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/Products-All" element={<ProductApp profile={profile} setProfile={setProfile} showWarning={showWarning} searchQuery={searchQuery} />} />
+                  <Route path="/register" element={<Register setProfile={setProfile} />} />
+                  <Route path="/login" element={<Login setProfile={setProfile} />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/service" element={<Service />} />
+                  <Route path="/sample-courier" element={<SampleCourierService />} />
+                  <Route path="/blog" element={<Blog />} />
+                  <Route path="/transport" element={<Transport />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/sea-freight" element={<SeaFreight />} />
+                  <Route path="/join-us" element={<JoinUs />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route
+                    path="/admin/*"
+                    element={
+                      <ProtectedAdminRoute>
+                        <AdminLayout handleLogout={handleLogout} />
+                      </ProtectedAdminRoute>
+                    }
+                  >
+                    <Route index element={<Dashboard />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="products" element={<ProductsAdmin />} />
+                    <Route path="market-prices" element={<AdminMarketPrices />} />
+                    <Route path="exchange-rates" element={<ExchangeRatesAdmin />} />
+                    <Route path="cif-rates" element={<CIFRatesAdmin />} />
+                    <Route path="orders" element={<Orders />} />
+                    <Route path="services" element={<Services />} />
+                    <Route path="pending-quotes" element={<PendingQuotes />} />
+                    <Route path="todays-orders" element={<TodaysOrders />} />
+                    <Route path="history" element={<History />} />
+                  </Route>
+                </Routes>
+              </Suspense>
             </main>
 
             {!isAdminDashboard && <Footer />}

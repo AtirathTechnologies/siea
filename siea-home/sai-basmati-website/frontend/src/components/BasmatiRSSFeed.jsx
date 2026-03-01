@@ -67,8 +67,7 @@ const BasmatiRSSFeed = () => {
         scrollXRef.current = 0;
       }
 
-      container.style.transform = `translateX(${scrollXRef.current}px)`;
-
+      container.style.transform = `translate3d(${scrollXRef.current}px,0,0)`;
       if (!paused) {
         animationRef.current = requestAnimationFrame(animate);
       }
@@ -194,13 +193,13 @@ const BasmatiRSSFeed = () => {
             {[...feeds, ...feeds].map((feed, i) => (
               <div
                 key={`${feed.id}-${i}`}
-                className={`flex items-center gap-3 cursor-pointer transition-all duration-300 px-4 py-1.5 rounded-lg border ${activeFeed === feed.id
-                  ? 'bg-yellow-600/30 border-yellow-400 scale-105'
-                  : 'hover:bg-yellow-900/50 hover:border-yellow-300/50 border-yellow-600/30'
-                  } ${feed.link && feed.link !== "#"
-                    ? 'hover:text-yellow-200'
-                    : 'cursor-not-allowed opacity-70'
-                  }`}
+                className={`flex items-center gap-3 
+                transition-all duration-300 px-4 py-1.5 rounded-lg border 
+                hover:bg-yellow-900/50 hover:border-yellow-300/50 border-yellow-600/30
+                hover:text-yellow-200
+                ${activeFeed === feed.id ? 'bg-yellow-600/30 border-yellow-400 scale-105' : ''}
+              `}
+                style={{ cursor: "pointer" }}
                 onClick={() => handleFeedClick(feed)}
               >
                 <span className={`text-lg ${getTypeColor(feed.type)}`}>

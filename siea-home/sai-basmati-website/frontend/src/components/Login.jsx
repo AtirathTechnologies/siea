@@ -4,7 +4,7 @@ import { get, ref } from "firebase/database";
 import { auth, db } from "../firebase";
 import { Link, useNavigate } from "react-router-dom";
 import "../Login.css";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo.svg";
 import { useLanguage } from "../contexts/LanguageContext";
 
 export default function Login({ setProfile }) {

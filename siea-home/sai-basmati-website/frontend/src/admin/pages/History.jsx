@@ -1,44 +1,76 @@
 import React, { useEffect, useState } from "react";
-import { ref, onValue } from "firebase/database";
+import { ref, query, orderByChild, limitToLast, endAt, get } from "firebase/database";
 import { db } from "../../firebase";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 export default function History() {
   const [history, setHistory] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rawDataView, setRawDataView] = useState(false);
+  const PAGE_SIZE = 200;
+  const [lastTimestamp, setLastTimestamp] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
 
   const notifyAdminModal = (open) => {
     window.dispatchEvent(new CustomEvent("admin-modal", { detail: open }));
   };
 
   useEffect(() => {
-    const historyRef = ref(db, "history");
+    loadInitial();
+  }, []);
+
+  const loadInitial = async () => {
     setLoading(true);
 
-    const unsub = onValue(historyRef, (snap) => {
-      if (!snap.exists()) {
-        setHistory([]);
-        setLoading(false);
-        return;
-      }
+    const snap = await get(
+      query(
+        ref(db, "history"),
+        orderByChild("timestamp"),
+        limitToLast(PAGE_SIZE)
+      )
+    );
 
-      try {
-        const list = Object.entries(snap.val())
-          .map(([id, data]) => ({ id, ...data }))
-          .sort((a, b) => b.timestamp - a.timestamp);
+    if (!snap.exists()) {
+      setHistory([]);
+      setLoading(false);
+      return;
+    }
 
-        setHistory(list);
-      } catch (error) {
-        console.error("Error processing history data:", error);
-        setHistory([]);
-      } finally {
-        setLoading(false);
-      }
-    });
+    const list = Object.entries(snap.val())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    return () => unsub();
-  }, []);
+    setHistory(list);
+    setLastTimestamp(list[list.length - 1]?.timestamp);
+    setLoading(false);
+  };
+
+  const loadMore = async () => {
+    if (!lastTimestamp) return;
+
+    const snap = await get(
+      query(
+        ref(db, "history"),
+        orderByChild("timestamp"),
+        endAt(lastTimestamp - 1),
+        limitToLast(PAGE_SIZE)
+      )
+    );
+
+    if (!snap.exists()) {
+      setHasMore(false);
+      return;
+    }
+
+    const more = Object.entries(snap.val())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    setHistory(prev => [...prev, ...more]);
+    setLastTimestamp(more[more.length - 1]?.timestamp);
+  };
 
   const getActionColor = (action) => {
     switch (action) {
@@ -163,6 +195,23 @@ export default function History() {
       console.error("Error extracting data:", error);
       return [];
     }
+  };
+
+  const exportToExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(history);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "History");
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const file = new Blob([excelBuffer], {
+      type: "application/octet-stream",
+    });
+
+    saveAs(file, "history.xlsx");
   };
 
   // Render grades for a product
@@ -575,6 +624,14 @@ export default function History() {
         </div>
       ) : (
         <>
+          <div className="tw-flex tw-justify-end tw-mb-4">
+            <button
+              onClick={exportToExcel}
+              className="tw-bg-green-600 hover:tw-bg-green-700 tw-text-white tw-px-4 tw-py-2 tw-rounded"
+            >
+              Export to Excel
+            </button>
+          </div>
           <div className="tw-overflow-x-auto">
             <table className="tw-w-full tw-bg-black/40 tw-rounded-xl">
               <thead>
@@ -644,6 +701,16 @@ export default function History() {
                 ))}
               </tbody>
             </table>
+            {hasMore && (
+              <div className="tw-text-center tw-mt-6">
+                <button
+                  onClick={loadMore}
+                  className="tw-bg-yellow-500 hover:tw-bg-yellow-600 tw-text-black tw-px-6 tw-py-2 tw-rounded"
+                >
+                  Load More
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ================= MODAL ================= */}

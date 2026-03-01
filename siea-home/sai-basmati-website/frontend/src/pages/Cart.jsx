@@ -41,7 +41,7 @@ const Cart = () => {
         } catch (e) {
           console.error('Error parsing seaFreightModalData:', e);
         }
-        
+
         setShowBuyModal(true);
         localStorage.removeItem('seaFreightModalData');
         // seaFreightReturnTo will be removed by BuyModal
@@ -56,7 +56,7 @@ const Cart = () => {
       }
     };
     window.addEventListener('storage', handleStorageChange);
-    
+
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [location.pathname]);
 
@@ -375,12 +375,19 @@ const Cart = () => {
     }
   };
 
-  // Handle item removal
-  const handleRemoveItem = useCallback((itemId) => {
-    if (window.confirm('Are you sure you want to remove this item?')) {
-      removeFromCart(itemId);
-      setLocalCartItems(prev => prev.filter(i => i.id !== itemId));
-    }
+  const handleRemoveItem = useCallback((itemId, grade, packing, quantityUnit) => {
+    removeFromCart(itemId, grade, packing, quantityUnit);
+
+    setLocalCartItems(prev =>
+      prev.filter(item =>
+        !(
+          item.id === itemId &&
+          item.grade === grade &&
+          item.packing === packing &&
+          item.quantityUnit === quantityUnit
+        )
+      )
+    );
   }, [removeFromCart]);
 
   // Special product object for cart
@@ -512,6 +519,11 @@ const Cart = () => {
                               <p className="tw-text-sm tw-text-yellow-200/80 tw-mb-1">
                                 Quantity per bag: {item.quantityUnit || '1 unit'}
                               </p>
+                              {item.packing && (
+                                <p className="tw-text-sm tw-text-yellow-200/80 tw-mb-1">
+                                  Packing: {item.packing}
+                                </p>
+                              )}
                               <p className="tw-text-sm tw-text-yellow-200/80 tw-mb-1">
                                 Price per bag: {formatPrice(pricePerBag)}
                               </p>
@@ -593,7 +605,14 @@ const Cart = () => {
                             </div>
 
                             <button
-                              onClick={() => handleRemoveItem(item.id)}
+                              onClick={() =>
+                                handleRemoveItem(
+                                  item.id,
+                                  item.grade,
+                                  item.packing,
+                                  item.quantityUnit
+                                )
+                              }
                               className="tw-text-red-400 hover:tw-text-red-300 tw-transition tw-flex tw-items-center tw-gap-2 tw-self-end sm:tw-self-auto"
                             >
                               <svg className="tw-w-5 tw-h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

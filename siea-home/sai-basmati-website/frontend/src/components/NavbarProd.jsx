@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext.jsx';
-import Logo from '../assets/logo.png';
+import Logo from '../assets/logo.svg';
 
 const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profile, handleLogout }) => {
   const { t } = useLanguage();

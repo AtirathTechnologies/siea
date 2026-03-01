@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../../firebase";
 import { ref, get, set } from "firebase/database";
 import { v4 as uuidv4 } from "uuid";
+import { remove } from "firebase/database";
 
 /* ---------------- EMPTY FORM ---------------- */
 const emptyForm = () => ({
@@ -38,20 +39,19 @@ const CIFRatesAdmin = () => {
   useEffect(() => {
     const load = async () => {
       const snap = await get(ref(db, "cifRates"));
-      const raw = snap.exists() ? Object.values(snap.val()) : [];
+      const raw = snap.exists() ? snap.val() : {};
 
-      // guarantee unique keys
-      const withIds = raw.map(r => ({
-        ...r,
-        id: r.id || uuidv4(),
+      const dataArray = Object.keys(raw).map(key => ({
+        ...raw[key],
+        id: key,
       }));
 
-      setRates(withIds);
+      setRates(dataArray);
       setLoading(false);
     };
+
     load();
   }, []);
-
   /* ---------------- FILTER OPTIONS ---------------- */
   const filters = useMemo(() => {
     const g = new Set(), c = new Set(), cn = new Set();
@@ -85,23 +85,24 @@ const CIFRatesAdmin = () => {
 
   /* ---------------- FORM HANDLERS ---------------- */
   const saveRate = async () => {
-    if (
-      !form.Grade ||
-      !form.Country ||
-      !form.Ex_Mill_Min ||
-      !form.Ex_Mill_Max
-    ) {
+    if (!form.Grade || !form.Country || !form.Ex_Mill_Min || !form.Ex_Mill_Max) {
       alert("Grade, Country and CIF are required");
       return;
     }
 
-    const updated =
-      editing === "new"
-        ? [...rates, { ...form, id: uuidv4() }]
-        : rates.map(r => (r.id === editing ? form : r));
+    const rateId = editing === "new" ? uuidv4() : editing;
 
-    await set(ref(db, "cifRates"), updated);
-    setRates(updated);
+    await set(ref(db, `cifRates/${rateId}`), {
+      ...form,
+      id: rateId,
+    });
+
+    setRates(prev =>
+      editing === "new"
+        ? [...prev, { ...form, id: rateId }]
+        : prev.map(r => (r.id === rateId ? { ...form, id: rateId } : r))
+    );
+
     setEditing(null);
     setForm(emptyForm());
   };
@@ -109,9 +110,9 @@ const CIFRatesAdmin = () => {
   const deleteRate = async (id) => {
     if (!window.confirm("Delete this CIF rate?")) return;
 
-    const updated = rates.filter(r => r.id !== id);
-    await set(ref(db, "cifRates"), updated);
-    setRates(updated);
+    await remove(ref(db, `cifRates/${id}`));
+
+    setRates(prev => prev.filter(r => r.id !== id));
   };
 
   /* ---------------- LOADER ---------------- */

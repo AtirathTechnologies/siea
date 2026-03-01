@@ -41,6 +41,9 @@ export const calculateCIFUSD = (
   country,
   port
 ) => {
+   console.log("CIF FUNCTION CALLED");
+  console.log("exMillMin:", exMillMin);
+  console.log("exMillMax:", exMillMax);
   const fobMinINR = exMillMin + 4000;
   const fobMaxINR = exMillMax + 4000;
 

@@ -2327,3 +2327,34 @@ label {
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(251, 191, 36, 0.5);
 }
+
+.scrolling-container {
+  pointer-events: auto !important;
+}
+
+.scrolling-container > div {
+  cursor: pointer !important;
+}
+
+.sidebar-toggle-btn {
+  top: 4.5rem;
+}
+
+@media (max-width: 640px) {
+  .sidebar-toggle-btn {
+    top: 6.5rem;
+  }
+}
+
+.sidebar-toggle-btn.open {
+  top: 1rem;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

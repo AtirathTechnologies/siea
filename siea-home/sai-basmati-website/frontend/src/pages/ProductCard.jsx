@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext.jsx';
 import { db } from '../firebase';
-import { ref, onValue } from 'firebase/database';
+import { ref, get } from 'firebase/database';
+import { PACKING_RULES } from "../utils/packingUtils";
+
 
 const ProductCard = ({
   product,
@@ -23,6 +25,11 @@ const ProductCard = ({
   const [gradePricePerKg, setGradePricePerKg] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
 
+  const getQuantityInKg = () => {
+    if (quantity === '1ton') return 1000;
+    return parseInt(quantity.replace('kg', '')) || 0;
+  };
+
   const productName =
     product.name?.[currentLang] ||
     product.name?.en ||
@@ -39,79 +46,97 @@ const ProductCard = ({
   const productSpecs = product.specs || {};
   const productHSN = product.hsn || null;
 
-  // Fetch grades from Firebase
-  useEffect(() => {
-    if (!product?.firebaseId) return;
+  const [selectedPacking, setSelectedPacking] = useState('');
 
-    const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
-    const unsubscribe = onValue(gradesRef, (snap) => {
+  const availablePackingOptions = useMemo(() => {
+    return Object.keys(PACKING_RULES).filter((packingType) => {
+      const rule = PACKING_RULES[packingType];
+      const allowedSizes = Object.keys(rule.rates).map(Number);
+      const minSize = Math.min(...allowedSizes);
+      const maxSize = Math.max(...allowedSizes);
+
+      const qtyKg =
+        quantity === '1ton'
+          ? 1000
+          : parseInt(quantity.replace('kg', '')) || 0;
+
+      if (!qtyKg) return true;
+      if (qtyKg < minSize) return false;
+      if (allowedSizes.includes(qtyKg)) return true;
+      if (qtyKg > maxSize) return true;
+
+      return false;
+    });
+  }, [quantity]);
+
+  
+  // Fetch grades from Firebase
+  // Fetch grades (one time, no listener)
+  useEffect(() => {
+    const fetchGrades = async () => {
+      if (!product?.firebaseId) return;
+
+      const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
+      const snap = await get(gradesRef);
+
       if (snap.exists()) {
         const gradesData = snap.val();
-        const gradesArray = Object.keys(gradesData).map(key => ({
-          id: key,
-          ...gradesData[key]
-        }));
-        const gradeNames = gradesArray.map(g => g.grade).filter(Boolean);
+        const gradeNames = Object.values(gradesData)
+          .map(g => g.grade)
+          .filter(Boolean);
         setGrades(gradeNames);
       } else {
         setGrades([]);
       }
-    });
+    };
 
-    return () => unsubscribe();
+    fetchGrades();
   }, [product?.firebaseId]);
 
-  // When grade changes, fetch its price (which is PER KG in Firebase)
+  // Reset packing if invalid
+  useEffect(() => {
+    if (selectedPacking && !availablePackingOptions.includes(selectedPacking)) {
+      setSelectedPacking('');
+    }
+  }, [quantity]);
+
+  // Fetch selected grade price
   useEffect(() => {
     const fetchGradePrice = async () => {
       if (!selectedGrade || !product?.firebaseId) return;
 
-      try {
-        const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
-        const snap = await onValue(gradesRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const gradesData = snapshot.val();
-            const gradesArray = Object.keys(gradesData).map(key => ({
-              id: key,
-              ...gradesData[key]
-            }));
+      const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
+      const snap = await get(gradesRef);
 
-            const selectedGradeObj = gradesArray.find(g =>
-              g.grade && g.grade.toLowerCase() === selectedGrade.toLowerCase()
-            );
+      if (snap.exists()) {
+        const gradesData = snap.val();
 
-            if (selectedGradeObj) {
-              // price_inr is PER KG in Firebase (like ₹95 per kg)
-              const pricePerKg = selectedGradeObj.price_inr || 0;
-              setGradePricePerKg(pricePerKg);
-            }
-          }
-        }, { onlyOnce: true });
-      } catch (error) {
-        console.error('Error fetching grade price:', error);
+        const selectedGradeObj = Object.values(gradesData).find(g =>
+          g.grade?.toLowerCase() === selectedGrade.toLowerCase()
+        );
+
+        if (selectedGradeObj) {
+          setGradePricePerKg(selectedGradeObj.price_inr || 0);
+        }
       }
     };
 
     fetchGradePrice();
   }, [selectedGrade, product?.firebaseId]);
 
-  // Calculate total price when grade price or quantity changes
+  // Calculate total price
   useEffect(() => {
     if (!gradePricePerKg) {
       setTotalPrice(0);
       return;
     }
 
-    let quantityInKg;
-    if (quantity === '1ton') {
-      quantityInKg = 1000; // 1 ton = 1000 kg
-    } else {
-      quantityInKg = parseInt(quantity.replace('kg', '')) || 0;
-    }
+    const quantityInKg =
+      quantity === '1ton'
+        ? 1000
+        : parseInt(quantity.replace('kg', '')) || 0;
 
-    // Total = price per kg × quantity in kg
-    const total = gradePricePerKg * quantityInKg;
-    setTotalPrice(total);
+    setTotalPrice(gradePricePerKg * quantityInKg);
   }, [gradePricePerKg, quantity]);
 
   const formatPriceWithCurrency = () => {
@@ -157,8 +182,8 @@ const ProductCard = ({
   };
 
   const handleCartSubmit = () => {
-    if (!selectedGrade) {
-      alert('Please select a grade');
+    if (!selectedGrade || !quantity || !selectedPacking) {
+      alert('Please select grade, quantity and packing');
       return;
     }
 
@@ -192,7 +217,7 @@ const ProductCard = ({
       productForCart,
       selectedGrade,
       1, // quantity count (1 cart item)
-      '', // packing
+      selectedPacking,
       priceStr, // price description
       quantityDisplay, // quantity unit (e.g., "5kg", "1ton")
       totalPriceForCart // total price for this cart item
@@ -203,6 +228,7 @@ const ProductCard = ({
     setQuantity('5kg');
     setGradePricePerKg(0);
     setTotalPrice(0);
+    setSelectedPacking('');
     alert('✅ Product added to cart!');
   };
 
@@ -215,11 +241,12 @@ const ProductCard = ({
     <>
       <div className="product-card glass">
         <img
+          loading="lazy"
           src={productImage}
           alt={productName}
           className="product-image"
           onError={(e) => {
-            e.target.src = './img/placeholder-rice.jpg';
+            e.target.src = './img/placeholder-rice.webp';
           }}
         />
 
@@ -324,17 +351,6 @@ const ProductCard = ({
                   </select>
                 </div>
 
-                {selectedGrade && gradePricePerKg > 0 && (
-                  <div className="tw-p-3 tw-bg-yellow-400/10 tw-border tw-border-yellow-400/20 tw-rounded-lg">
-                    <p className="tw-text-sm tw-font-semibold tw-text-yellow-300">
-                      Price: ₹{gradePricePerKg.toFixed(2)} per kg
-                    </p>
-                    <p className="tw-text-xs tw-text-yellow-200/70 tw-mt-1">
-                      (₹{Math.round(pricePerQuintal).toLocaleString()} per quintal)
-                    </p>
-                  </div>
-                )}
-
                 <div>
                   <label className="tw-block tw-text-sm tw-font-medium tw-text-yellow-300 tw-mb-1">
                     Select Quantity *
@@ -347,6 +363,22 @@ const ProductCard = ({
                     <option value="">Select Quantity</option>
                     {quantityOptions.map((qty, index) => (
                       <option key={index} value={qty}>{qty}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="tw-block tw-text-sm tw-font-medium tw-text-yellow-300 tw-mb-1">
+                    Select Packing *
+                  </label>
+                  <select
+                    value={selectedPacking}
+                    onChange={(e) => setSelectedPacking(e.target.value)}
+                    className="tw-w-full tw-bg-gray-800/50 tw-border tw-border-yellow-400/30 tw-rounded-lg tw-p-3 tw-text-white focus:tw-outline-none focus:tw-border-yellow-500"
+                  >
+                    <option value="">Select Packing</option>
+                    {availablePackingOptions.map((pack, index) => (
+                      <option key={index} value={pack}>{pack}</option>
                     ))}
                   </select>
                 </div>
@@ -376,8 +408,7 @@ const ProductCard = ({
                 <button
                   onClick={handleCartSubmit}
                   className="tw-flex-1 tw-bg-yellow-400 tw-text-black tw-font-bold tw-py-3 tw-px-4 tw-rounded-xl hover:tw-bg-yellow-500 tw-transition disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
-                  disabled={!selectedGrade || !quantity}
-                >
+                  disabled={!selectedGrade || !quantity || !selectedPacking}                >
                   Add to Cart
                 </button>
               </div>
@@ -389,4 +420,4 @@ const ProductCard = ({
   );
 };
 
-export default ProductCard;
+export default React.memo(ProductCard);
