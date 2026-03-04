@@ -251,15 +251,6 @@ export default function Navbar({ profile, setProfile, handleLogout, onProfileCli
                     </svg>
                   </button>
                 </li>
-
-                <li className="lg:tw-hidden">
-                  <button
-                    onClick={handleLocalLogout}
-                    className="tw-block tw-w-full tw-bg-red-600 tw-text-white tw-px-6 tw-py-2 tw-rounded tw-font-medium hover:tw-bg-red-700 tw-transition tw-duration-150"
-                  >
-                    Logout
-                  </button>
-                </li>
               </>
             ) : (
               <>

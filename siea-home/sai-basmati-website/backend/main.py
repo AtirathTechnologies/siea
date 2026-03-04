@@ -1,5 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import feedparser
 import httpx
 from datetime import datetime
@@ -27,8 +31,18 @@ app.add_middleware(
 ) 
 
 
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+    raise Exception("Razorpay keys not found in environment variables")
+
+
+print("KEY ID:", RAZORPAY_KEY_ID)
+print("KEY SECRET:", RAZORPAY_KEY_SECRET)
+
 razorpay_client = razorpay.Client(
-    auth=(os.environ["RAZORPAY_KEY_ID"], os.environ["RAZORPAY_KEY_SECRET"])
+    auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
 )
 
 FOOD_KEYWORDS = [
@@ -219,9 +233,10 @@ def create_order(data: dict):
             "payment_capture": 1
         })
         return {"success": True, "order": order}
-
+    
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        print("Razorpay Order Error:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")

@@ -74,6 +74,13 @@ footer {
   }
 }
 
+@media (max-width: 767px) {
+  footer {
+    position: relative;
+    margin-top: auto;
+  }
+}
+
 /* Products container */
 .products-container {
   flex: 1;
@@ -406,13 +413,18 @@ label {
 .select-field option {
   width: 300px;
 }
+
 /* REMOVE DROPDOWN ARROW – CATEGORY ONLY */
 .no-arrow {
-  appearance: none;          /* Chrome, Edge */
-  -webkit-appearance: none;  /* Safari */
-  -moz-appearance: none;     /* Firefox */
+  appearance: none;
+  /* Chrome, Edge */
+  -webkit-appearance: none;
+  /* Safari */
+  -moz-appearance: none;
+  /* Firefox */
   background-image: none !important;
-  padding-right: 12px;       /* remove arrow space */
+  padding-right: 12px;
+  /* remove arrow space */
 }
 
 /* IE / old Edge */
@@ -2332,7 +2344,7 @@ label {
   pointer-events: auto !important;
 }
 
-.scrolling-container > div {
+.scrolling-container>div {
   cursor: pointer !important;
 }
 
@@ -2354,6 +2366,7 @@ label {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }

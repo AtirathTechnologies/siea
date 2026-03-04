@@ -93,7 +93,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
           const userEmail = auth.currentUser?.email || profile.email;
           const userName = profile.displayName || userEmail?.split("@")[0] || "User";
           const newUserKey = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          
+
           const newUserData = {
             uid: profile.uid,
             fullName: userName,
@@ -110,13 +110,13 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
 
           try {
             await set(dbRef(db, `users/${newUserKey}`), newUserData);
-            
+
             // Update editData with the newly created user
             setEditData({
               ...newUserData,
               customId: newUserKey,
             });
-            
+
             // Update profile state
             const updatedProfile = {
               ...profile,
@@ -125,7 +125,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
             };
             setProfile(updatedProfile);
             localStorage.setItem("profile", JSON.stringify(updatedProfile));
-            
+
           } catch (error) {
             console.error("Error creating user record:", error);
             // Fallback to basic data if creation fails
@@ -323,7 +323,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
       } else {
         // STEP 5: Check if we need to create a new user or update existing
         let userRefPath = `users/${editData.customId}`;
-        
+
         // If no customId exists, create a new one
         if (!editData.customId) {
           const newUserKey = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -372,11 +372,11 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
       setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     } catch (err) {
       console.error("Save error:", err);
-      setMessage({ 
-        type: "error", 
-        text: err.code === "PERMISSION_DENIED" 
-          ? "Permission denied. Please check your database rules." 
-          : "Failed to save changes. Please try again." 
+      setMessage({
+        type: "error",
+        text: err.code === "PERMISSION_DENIED"
+          ? "Permission denied. Please check your database rules."
+          : "Failed to save changes. Please try again."
       });
     } finally {
       setIsLoading(false);
@@ -393,35 +393,35 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
     try {
       // First sign out from Firebase
       await auth.signOut();
-      
+
       // Clear Firebase persistence storage (IndexedDB, localStorage, etc.)
       await clearFirebasePersistence();
-      
+
       // Clear ALL localStorage items
       localStorage.clear();
-      
+
       // Clear ALL sessionStorage items
       sessionStorage.clear();
-      
+
       // Clear cookies
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
           .replace(/^ +/, "")
           .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
-      
+
       console.log("User signed out and all data cleared successfully");
-      
+
       // Notify parent components
       onLogout();
       onClose();
-      
+
       // Force hard redirect to home with page reload
       setTimeout(() => {
         window.location.href = "/";
         window.location.reload();
       }, 100);
-      
+
     } catch (error) {
       console.error("Error signing out:", error);
       // Still clear everything and redirect even if Firebase signout fails
@@ -442,7 +442,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
       const databases = await window.indexedDB.databases();
       for (const dbInfo of databases) {
         if (dbInfo.name && (
-          dbInfo.name.includes('firebase') || 
+          dbInfo.name.includes('firebase') ||
           dbInfo.name.includes('Firebase') ||
           dbInfo.name.includes('firestore') ||
           dbInfo.name.includes('auth')
@@ -450,14 +450,14 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
           window.indexedDB.deleteDatabase(dbInfo.name);
         }
       }
-      
+
       // Clear localStorage items with firebase prefix
       Object.keys(localStorage).forEach(key => {
         if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
           localStorage.removeItem(key);
         }
       });
-      
+
       // Clear sessionStorage items with firebase prefix
       Object.keys(sessionStorage).forEach(key => {
         if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
@@ -480,15 +480,15 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
   const getAvatarInitial = () => {
     const name = getDisplayName();
     const currentAvatar = editData.avatar || profile?.avatar;
-    
+
     if (currentAvatar && currentAvatar.trim() !== '') {
-      if (currentAvatar.startsWith('data:image/') || 
-          currentAvatar.startsWith('http://') || 
-          currentAvatar.startsWith('https://')) {
+      if (currentAvatar.startsWith('data:image/') ||
+        currentAvatar.startsWith('http://') ||
+        currentAvatar.startsWith('https://')) {
         return null;
       }
     }
-    
+
     return name.charAt(0).toUpperCase();
   };
 
@@ -504,7 +504,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
       {/* Main Panel */}
       <aside className="
         tw-fixed tw-z-50 tw-bg-gray-900 tw-text-white tw-shadow-2xl tw-border tw-border-gray-700 tw-flex tw-flex-col
-        tw-bottom-0 tw-left-0 tw-right-0 tw-w-full tw-max-h-[85vh] tw-rounded-t-2xl
+        tw-top-16 tw-left-1/2 -tw-translate-x-1/2 tw-w-[95%] tw-max-h-[85vh] tw-rounded-2xl
         sm:tw-top-24 sm:tw-bottom-auto sm:tw-left-1/2 sm:-tw-translate-x-1/2 sm:tw-w-[90%] sm:tw-max-w-[520px] sm:tw-rounded-2xl
         lg:tw-top-28 lg:tw-right-6 lg:tw-left-auto lg:tw-translate-x-0 lg:tw-w-[420px] lg:tw-max-h-[85vh]
       ">
@@ -633,9 +633,9 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
                     <div className="tw-relative tw-w-32 tw-h-32 tw-mb-4">
                       <div className="tw-w-32 tw-h-32 tw-rounded-full tw-overflow-hidden tw-ring-4 tw-ring-yellow-400/50 tw-shadow-xl">
                         {editData.avatar ? (
-                          <img 
-                            src={editData.avatar} 
-                            alt="Profile" 
+                          <img
+                            src={editData.avatar}
+                            alt="Profile"
                             className="tw-w-full tw-h-full tw-object-cover"
                             onError={(e) => {
                               e.target.style.display = 'none';
@@ -757,7 +757,7 @@ export default function ProfilePanel({ isOpen, profile, setProfile, onClose, onL
           )}
         </div>
 
-        
+
       </aside>
 
       {/* My Orders Popup */}

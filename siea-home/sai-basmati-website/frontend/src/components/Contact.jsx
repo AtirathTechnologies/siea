@@ -56,7 +56,7 @@ export default function Contact() {
               <a
                 href={`mailto:${companyEmail}`}
                 className="tw-text-blue-300 hover:tw-text-blue-200 
-                           tw-underline tw-transition-all tw-duration-200"
+                           tw-underline tw-transition-all tw-duration-200 tw-break-all"
               >
                 {companyEmail}
               </a>
