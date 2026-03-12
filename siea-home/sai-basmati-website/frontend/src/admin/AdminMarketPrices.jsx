@@ -1,4 +1,3 @@
-// src/admin/AdminPrices.jsx
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
 import { ref, onValue, update } from "firebase/database";
@@ -8,7 +7,7 @@ export default function AdminPrices() {
   const [selectedState, setSelectedState] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // For adding new items
+
   const [addingNewItem, setAddingNewItem] = useState({
     category: null,
     varietyIndex: null,
@@ -20,7 +19,7 @@ export default function AdminPrices() {
     price: ""
   });
 
-  // For adding new variety
+
   const [addingNewVariety, setAddingNewVariety] = useState({
     category: null,
     isAdding: false
@@ -30,7 +29,7 @@ export default function AdminPrices() {
     items: []
   });
 
-  // Track edited items
+
   const [editIndex, setEditIndex] = useState({
     variety: null,
     item: null
@@ -48,7 +47,7 @@ export default function AdminPrices() {
       if (snapshot.exists()) {
         const allData = snapshot.val();
         setData(allData);
-        // Set default state only if not already set
+
         if (!selectedState && Object.keys(allData).length > 0) {
           setSelectedState(Object.keys(allData)[0]);
         }
@@ -71,16 +70,16 @@ export default function AdminPrices() {
 
     const updated = { ...data };
 
-    // Ensure items array exists
+    
     if (!updated[selectedState][category][vIndex].items) {
       updated[selectedState][category][vIndex].items = [];
     }
 
-    // Ensure we're updating at the correct index
+    
     if (updated[selectedState][category][vIndex].items[iIndex]) {
       updated[selectedState][category][vIndex].items[iIndex] = editFields;
     } else {
-      // If item doesn't exist at index, push it
+      
       updated[selectedState][category][vIndex].items.push(editFields);
     }
 
@@ -124,7 +123,7 @@ export default function AdminPrices() {
 
     const updated = { ...data };
 
-    // Ensure the items array exists before pushing
+    
     if (!updated[selectedState][category][varietyIndex].items) {
       updated[selectedState][category][varietyIndex].items = [];
     }
@@ -138,7 +137,7 @@ export default function AdminPrices() {
     try {
       await update(ref(db, `market_rates/${selectedState}`), updated[selectedState]);
 
-      // Reset
+      
       setAddingNewItem({
         category: null,
         varietyIndex: null,
@@ -183,12 +182,12 @@ export default function AdminPrices() {
 
     const updated = { ...data };
 
-    // Ensure the category array exists
+    
     if (!updated[selectedState][category]) {
       updated[selectedState][category] = [];
     }
 
-    // Add new variety with empty items array
+    
     updated[selectedState][category].push({
       variety: newVariety.variety,
       items: []
@@ -197,7 +196,7 @@ export default function AdminPrices() {
     try {
       await update(ref(db, `market_rates/${selectedState}`), updated[selectedState]);
 
-      // Reset
+      
       setAddingNewVariety({
         category: null,
         isAdding: false
@@ -234,7 +233,7 @@ export default function AdminPrices() {
 
     const updated = { ...data };
 
-    // Check if category and variety exist
+    
     if (updated[selectedState][category] && updated[selectedState][category][vIndex]) {
       updated[selectedState][category].splice(vIndex, 1);
 
@@ -256,7 +255,7 @@ export default function AdminPrices() {
 
   const states = Object.keys(data);
 
-  // If no data or no state selected, show empty state
+  
   if (states.length === 0) {
     return (
       <div style={styles.container}>
@@ -287,7 +286,7 @@ export default function AdminPrices() {
     <div style={styles.container}>
       <h1 style={styles.mainTitle}>Admin – Market Prices</h1>
 
-      {/* States Tabs */}
+      
       <div style={styles.tabRow}>
         {states.map((state) => (
           <button
@@ -310,7 +309,7 @@ export default function AdminPrices() {
           {selectedState.replace("_", " ").toUpperCase()}
         </h2>
 
-        {/* BASMATI */}
+        
         {data[selectedState]?.basmati && data[selectedState].basmati.length > 0 && (
           <>
             <div style={styles.categoryHeader}>
@@ -324,7 +323,7 @@ export default function AdminPrices() {
               </button>
             </div>
 
-            {/* Add New Variety Form */}
+            
             {addingNewVariety.isAdding && addingNewVariety.category === "basmati" && (
               <div style={styles.addNewVarietyForm}>
                 <h4 style={styles.formTitle}>Add New Basmati Variety</h4>
@@ -379,7 +378,7 @@ export default function AdminPrices() {
                   </div>
                 </div>
 
-                {/* Existing Items */}
+                
                 {variety.items && variety.items.map((item, iIndex) => {
                   const isEditing =
                     editIndex.variety === vIndex &&
@@ -387,7 +386,7 @@ export default function AdminPrices() {
 
                   return (
                     <div key={iIndex} style={styles.row}>
-                      {/* TYPE */}
+                      
                       {isEditing ? (
                         <input
                           value={editFields.type}
@@ -403,7 +402,7 @@ export default function AdminPrices() {
                         <span style={styles.rowLabel}>{item.type}</span>
                       )}
 
-                      {/* CROP YEAR */}
+                      
                       {isEditing ? (
                         <input
                           value={editFields.crop_year}
@@ -419,7 +418,7 @@ export default function AdminPrices() {
                         <span>{item.crop_year}</span>
                       )}
 
-                      {/* PRICE */}
+                      
                       {isEditing ? (
                         <input
                           value={editFields.price}
@@ -435,7 +434,7 @@ export default function AdminPrices() {
                         <span style={styles.rowPrice}>{item.price}</span>
                       )}
 
-                      {/* BUTTONS */}
+                      
                       <div style={styles.itemActions}>
                         {isEditing ? (
                           <button
@@ -465,7 +464,7 @@ export default function AdminPrices() {
                   );
                 })}
 
-                {/* Add New Item Form */}
+                
                 {addingNewItem.isAdding &&
                   addingNewItem.category === "basmati" &&
                   addingNewItem.varietyIndex === vIndex && (
@@ -522,7 +521,7 @@ export default function AdminPrices() {
                     </div>
                   )}
 
-                {/* Empty state for variety with no items */}
+                
                 {(!variety.items || variety.items.length === 0) && !addingNewItem.isAdding && (
                   <div style={styles.emptyState}>
                     <p>No items added yet. Click "Add Item" to add products.</p>
@@ -533,7 +532,7 @@ export default function AdminPrices() {
           </>
         )}
 
-        {/* Show Add Variety button even if no basmati data exists */}
+        
         {(!data[selectedState]?.basmati || data[selectedState].basmati.length === 0) && (
           <div>
             <div style={styles.categoryHeader}>
@@ -552,7 +551,7 @@ export default function AdminPrices() {
           </div>
         )}
 
-        {/* NON BASMATI */}
+        
         {data[selectedState]?.non_basmati && data[selectedState].non_basmati.length > 0 && (
           <>
             <div style={styles.categoryHeader}>
@@ -566,7 +565,7 @@ export default function AdminPrices() {
               </button>
             </div>
 
-            {/* Add New Variety Form */}
+            
             {addingNewVariety.isAdding && addingNewVariety.category === "non_basmati" && (
               <div style={styles.addNewVarietyForm}>
                 <h4 style={styles.formTitle}>Add New Non-Basmati Variety</h4>
@@ -621,7 +620,7 @@ export default function AdminPrices() {
                   </div>
                 </div>
 
-                {/* Existing Items */}
+
                 {variety.items && variety.items.map((item, iIndex) => {
                   const isEditing =
                     editIndex.variety === vIndex &&
@@ -703,7 +702,7 @@ export default function AdminPrices() {
                   );
                 })}
 
-                {/* Add New Item Form */}
+
                 {addingNewItem.isAdding &&
                   addingNewItem.category === "non_basmati" &&
                   addingNewItem.varietyIndex === vIndex && (
@@ -760,7 +759,7 @@ export default function AdminPrices() {
                     </div>
                   )}
 
-                {/* Empty state for variety with no items */}
+
                 {(!variety.items || variety.items.length === 0) && !addingNewItem.isAdding && (
                   <div style={styles.emptyState}>
                     <p>No items added yet. Click "Add Item" to add products.</p>
@@ -771,7 +770,7 @@ export default function AdminPrices() {
           </>
         )}
 
-        {/* Show Add Variety button even if no non-basmati data exists */}
+
         {(!data[selectedState]?.non_basmati || data[selectedState].non_basmati.length === 0) && (
           <div>
             <div style={styles.categoryHeader}>
@@ -794,7 +793,7 @@ export default function AdminPrices() {
   );
 }
 
-// Updated Styles
+
 const styles = {
   container: {
     background: "#000",

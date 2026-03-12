@@ -12,7 +12,7 @@ export default function AdminLayout() {
       const admin = document.getElementById("admin-scroll-container");
 
       if (e.detail === true) {
-        // lock everything
+
         document.documentElement.style.overflow = "hidden";
         document.body.style.overflow = "hidden";
 
@@ -21,7 +21,7 @@ export default function AdminLayout() {
           admin.style.height = "100vh";
         }
       } else {
-        // unlock
+
         document.documentElement.style.overflow = "";
         document.body.style.overflow = "";
 
@@ -48,10 +48,10 @@ export default function AdminLayout() {
     };
   }, []);
 
-  // Function to clear Firebase persistence
+
   const clearFirebasePersistence = async () => {
     try {
-      // Clear Firebase IndexedDB databases
+
       if (window.indexedDB && window.indexedDB.databases) {
         const databases = await window.indexedDB.databases();
         for (const dbInfo of databases) {
@@ -66,14 +66,14 @@ export default function AdminLayout() {
         }
       }
       
-      // Clear localStorage items with firebase prefix
+
       Object.keys(localStorage).forEach(key => {
         if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
           localStorage.removeItem(key);
         }
       });
       
-      // Clear sessionStorage items with firebase prefix
+
       Object.keys(sessionStorage).forEach(key => {
         if (key.includes('firebase') || key.includes('Firebase') || key.includes('auth')) {
           sessionStorage.removeItem(key);
@@ -84,22 +84,22 @@ export default function AdminLayout() {
     }
   };
 
-  // COMPLETE LOGOUT FUNCTION - Same as ProfilePanel
+
   const handleLogout = async () => {
     try {
-      // First sign out from Firebase
+
       await auth.signOut();
       
-      // Clear Firebase persistence storage (IndexedDB, localStorage, etc.)
+
       await clearFirebasePersistence();
       
-      // Clear ALL localStorage items
+      
       localStorage.clear();
       
-      // Clear ALL sessionStorage items
+      
       sessionStorage.clear();
       
-      // Clear cookies
+      
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
           .replace(/^ +/, "")
@@ -108,10 +108,10 @@ export default function AdminLayout() {
       
       console.log("Admin signed out and all data cleared successfully");
       
-      // Navigate to home
+
       navigate("/", { replace: true });
       
-      // Force hard redirect with page reload to clear all state
+      
       setTimeout(() => {
         window.location.href = "/";
         window.location.reload();
@@ -119,7 +119,7 @@ export default function AdminLayout() {
       
     } catch (error) {
       console.error("Admin logout error:", error);
-      // Still clear everything and redirect even if Firebase signout fails
+
       await clearFirebasePersistence();
       localStorage.clear();
       sessionStorage.clear();
@@ -131,7 +131,7 @@ export default function AdminLayout() {
 
   return (
     <div className="tw-flex tw-min-h-screen tw-bg-black">
-      {/* Mobile Hamburger Button */}
+
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="tw-fixed tw-top-4 tw-right-4 tw-z-50 tw-p-2 tw-bg-gray-900 tw-text-yellow-500 tw-rounded-lg lg:tw-hidden tw-border tw-border-yellow-500/30"
@@ -142,7 +142,7 @@ export default function AdminLayout() {
         </svg>
       </button>
 
-      {/* Sidebar with responsive classes */}
+
       <div className={`
         ${sidebarOpen ? 'tw-translate-x-0' : '-tw-translate-x-full'}
         lg:tw-translate-x-0 lg:tw-relative lg:tw-z-0
@@ -152,7 +152,7 @@ export default function AdminLayout() {
         <AdminSidebar onLogout={handleLogout} />
       </div>
 
-      {/* Overlay for mobile sidebar */}
+      
       {sidebarOpen && (
         <div
           className="tw-fixed tw-inset-0 tw-bg-black/50 tw-z-30 lg:tw-hidden"
@@ -160,7 +160,7 @@ export default function AdminLayout() {
         />
       )}
 
-      {/* Main content area */}
+
       <div className="tw-flex-1 tw-w-full">
         <div
           id="admin-scroll-container"

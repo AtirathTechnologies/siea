@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 app = FastAPI(title="Agriculture API")
 
 origins = [
-    "http://localhost:5173",   # local frontend
+    "http://localhost:5173", 
     "https://saiimportexportagro.com",
     "https://www.saiimportexportagro.com"
 ]

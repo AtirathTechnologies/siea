@@ -7,19 +7,21 @@ import { otherServices } from "../data/services";
 export default function Navbar({ profile, setProfile, handleLogout, onProfileClick = () => { } }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  const servicesRef = useRef(null); // for click outside detection
+  const servicesRef = useRef(null);
+  const moreRef = useRef(null);
 
   const serviceOptions = Object.keys(otherServices);
-  console.log('Service options:', serviceOptions); // verify data
 
-  // Close mobile menu & dropdown on route change
+  // Close mobile menu & dropdowns on route change
   useEffect(() => {
     setMenuOpen(false);
     setIsServicesOpen(false);
+    setIsMoreOpen(false);
   }, [location]);
 
   // Click outside handler for services dropdown
@@ -35,19 +37,39 @@ export default function Navbar({ profile, setProfile, handleLogout, onProfileCli
     };
   }, [isServicesOpen]);
 
-  const closeMenu = () => setMenuOpen(false);
+  // Click outside handler for more dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (isMoreOpen && moreRef.current && !moreRef.current.contains(event.target)) {
+        setIsMoreOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMoreOpen]);
+
+  const closeMenu = () => {
+    setMenuOpen(false);
+    setIsServicesOpen(false);
+    setIsMoreOpen(false);
+  };
 
   const handleServiceSelect = (service) => {
     closeMenu();
-    setIsServicesOpen(false);
     navigate(`/service?service=${encodeURIComponent(service)}`, {
       state: { selectedService: service }
     });
   };
 
+  const handleMoreSelect = (path) => {
+    closeMenu();
+    navigate(path);
+  };
+
   const handleSectionNavigation = (sectionId, isFooter = false) => {
     closeMenu();
-    setIsServicesOpen(false);
     if (location.pathname === "/") {
       setTimeout(() => {
         const element = document.getElementById(sectionId);
@@ -116,7 +138,7 @@ export default function Navbar({ profile, setProfile, handleLogout, onProfileCli
           </svg>
         </button>
 
-        {/* Mobile menu container - fixed overflow on desktop */}
+        {/* Mobile menu container */}
         <div
           className={`${menuOpen ? "tw-flex" : "tw-hidden"} 
           tw-flex-col lg:tw-flex lg:tw-flex-row 
@@ -158,7 +180,7 @@ export default function Navbar({ profile, setProfile, handleLogout, onProfileCli
               </NavLink>
             </li>
 
-            {/* SERVICES DROPDOWN - click toggle only */}
+            {/* SERVICES DROPDOWN */}
             <li ref={servicesRef} className="tw-relative">
               <button
                 onClick={() => setIsServicesOpen(prev => !prev)}
@@ -193,21 +215,10 @@ export default function Navbar({ profile, setProfile, handleLogout, onProfileCli
               )}
             </li>
 
+
             <li>
               <NavLink to="/sample-courier" className="tw-block tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150" onClick={closeMenu}>
                 {t("request_rice_samples")}
-              </NavLink>
-            </li>
-
-            <li>
-              <NavLink to="/join-us" className="tw-block tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150" onClick={closeMenu}>
-                {t("join_us")}
-              </NavLink>
-            </li>
-
-            <li>
-              <NavLink to="/blog" className="tw-block tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150" onClick={closeMenu}>
-                {t("blog")}
               </NavLink>
             </li>
 
@@ -217,41 +228,91 @@ export default function Navbar({ profile, setProfile, handleLogout, onProfileCli
               </NavLink>
             </li>
 
-            {profile ? (
-              <>
-                <li>
-                  <button
-                    onClick={() => {
-                      closeMenu();
-                      onProfileClick();
-                    }}
-                    className="tw-flex tw-items-center tw-gap-3 tw-px-4 tw-py-2 tw-rounded-lg tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-transition tw-duration-200 tw-font-medium tw-text-white"
-                  >
-                    <div className="tw-w-6 tw-h-6 tw-rounded-full tw-overflow-hidden tw-shadow-md tw-ring-2 tw-ring-yellow-500">
-                      {profile?.avatar ? (
-                        <img
-                          src={profile.avatar}
-                          alt="Profile"
-                          className="tw-w-full tw-h-full tw-object-cover"
-                          onError={(e) => {
-                            e.target.style.display = "none";
-                            e.target.parentNode.style.background = "linear-gradient(to bottom right, #22c55e, #3b82f6)";
-                            e.target.parentNode.innerHTML = `<span class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full tw-text-white tw-font-bold tw-text-sm">${getAvatarInitial()}</span>`;
-                          }}
-                        />
-                      ) : (
-                        <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-sm tw-font-bold">
-                          {getAvatarInitial()}
-                        </div>
-                      )}
-                    </div>
+            {/* MORE DROPDOWN */}
+            <li ref={moreRef} className="tw-relative">
+              <button
+                onClick={() => setIsMoreOpen(prev => !prev)}
+                className="tw-flex tw-items-center tw-gap-1 tw-py-1 tw-text-yellow-400 hover:tw-text-yellow-300 hover:tw-underline tw-transition tw-duration-150 tw-font-medium tw-w-full tw-text-left"
+              >
+                More
+                <div className={`tw-transition-transform tw-duration-200 ${isMoreOpen ? "tw-rotate-180" : ""}`}>
+                  <svg className="tw-w-4 tw-h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
 
-                    <svg className="tw-w-4 tw-h-4 tw-text-yellow-400 tw-hidden sm:tw-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                </li>
-              </>
+              {isMoreOpen && (
+                <div className="tw-absolute tw-left-0 tw-top-full tw-mt-2 tw-min-w-48 tw-bg-gray-900 tw-rounded-lg tw-shadow-xl tw-z-50">
+                  <div className="tw-py-2">
+                    <button
+                      onClick={() => handleMoreSelect("/join-us")}
+                      className="tw-block tw-w-full tw-text-left tw-px-4 tw-py-3 tw-text-yellow-400 hover:tw-bg-gray-800 tw-transition tw-duration-150 tw-border-t tw-border-gray-700 first:tw-border-t-0"
+                    >
+                      {t("join_us")}
+                    </button>
+                    <button
+                      onClick={() => handleMoreSelect("/blog")}
+                      className="tw-block tw-w-full tw-text-left tw-px-4 tw-py-3 tw-text-yellow-400 hover:tw-bg-gray-800 tw-transition tw-duration-150 tw-border-t tw-border-gray-700"
+                    >
+                      {t("blog")}
+                    </button>
+                    <button
+                      onClick={() => handleMoreSelect("/privacy-policy")}
+                      className="tw-block tw-w-full tw-text-left tw-px-4 tw-py-3 tw-text-yellow-400 hover:tw-bg-gray-800 tw-transition tw-duration-150 tw-border-t tw-border-gray-700"
+                    >
+                      Privacy Policy
+                    </button>
+                    <button
+                      onClick={() => handleMoreSelect("/terms")}
+                      className="tw-block tw-w-full tw-text-left tw-px-4 tw-py-3 tw-text-yellow-400 hover:tw-bg-gray-800 tw-transition tw-duration-150 tw-border-t tw-border-gray-700"
+                    >
+                      Terms & Conditions
+                    </button>
+                    <button
+                      onClick={() => handleMoreSelect("/shipping-policy")}
+                      className="tw-block tw-w-full tw-text-left tw-px-4 tw-py-3 tw-text-yellow-400 hover:tw-bg-gray-800 tw-transition tw-duration-150 tw-border-t tw-border-gray-700"
+                    >
+                      Shipping Policy
+                    </button>
+                  </div>
+                </div>
+              )}
+            </li>
+
+            {profile ? (
+              <li>
+                <button
+                  onClick={() => {
+                    closeMenu();
+                    onProfileClick();
+                  }}
+                  className="tw-flex tw-items-center tw-gap-3 tw-px-4 tw-py-2 tw-rounded-lg tw-bg-gray-800/50 hover:tw-bg-gray-700 tw-transition tw-duration-200 tw-font-medium tw-text-white"
+                >
+                  <div className="tw-w-6 tw-h-6 tw-rounded-full tw-overflow-hidden tw-shadow-md tw-ring-2 tw-ring-yellow-500">
+                    {profile?.avatar ? (
+                      <img
+                        src={profile.avatar}
+                        alt="Profile"
+                        className="tw-w-full tw-h-full tw-object-cover"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.parentNode.style.background = "linear-gradient(to bottom right, #22c55e, #3b82f6)";
+                          e.target.parentNode.innerHTML = `<span class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full tw-text-white tw-font-bold tw-text-sm">${getAvatarInitial()}</span>`;
+                        }}
+                      />
+                    ) : (
+                      <div className="tw-w-full tw-h-full tw-bg-gradient-to-br tw-from-green-500 tw-to-blue-500 tw-flex tw-items-center tw-justify-center tw-text-sm tw-font-bold">
+                        {getAvatarInitial()}
+                      </div>
+                    )}
+                  </div>
+
+                  <svg className="tw-w-4 tw-h-4 tw-text-yellow-400 tw-hidden sm:tw-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </li>
             ) : (
               <>
                 <li>

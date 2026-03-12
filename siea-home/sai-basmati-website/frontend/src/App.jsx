@@ -14,6 +14,9 @@ import AdminMarketPrices from "./admin/AdminMarketPrices";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { ref, onValue, off } from "firebase/database";
+import PrivacyPolicy from "./components/PrivacyPolicy.jsx";
+import TermsAndConditions from "./components/TermsandConditions.jsx";
+import ShippingPolicy from "./components/ShippingPolicy.jsx";
 const Home = lazy(() => import("./pages/Home"));
 const Products = lazy(() => import("./pages/Products"));
 const Prices = lazy(() => import("./pages/Prices"));
@@ -46,22 +49,53 @@ const ExchangeRatesAdmin = lazy(() => import("./admin/pages/ExchangeRatesAdmin.j
 
 
 
-function ScrollToHash() {
+// App.jsx – inside component body, before return
+function ScrollController() {
   const location = useLocation();
 
   useEffect(() => {
+    // 1. Tell the browser not to restore scroll position
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    // 2. Helper to scroll all potential containers
+    const scrollAllToTop = () => {
+      // Scroll the window itself (may not be enough, but safe)
+      window.scrollTo(0, 0);
+
+      // If the products container exists, scroll it
+      const productsContainer = document.querySelector('.products-container');
+      if (productsContainer) {
+        productsContainer.scrollTop = 0;
+      }
+
+      // If the main element has its own scroll, scroll it
+      const mainElement = document.querySelector('main');
+      if (mainElement && mainElement.scrollTop !== undefined) {
+        mainElement.scrollTop = 0;
+      }
+
+      // Add any other containers you know of (e.g., .sea-freight-container)
+    };
+
+    // 3. Handle hash links (smooth scroll to element)
     if (location.hash) {
-      const id = location.hash.replace("#", "");
+      const id = location.hash.replace('#', '');
       setTimeout(() => {
         const element = document.getElementById(id);
         if (element) {
-          const scrollTo =
-            id === "footer" ? document.body.scrollHeight : element.offsetTop - 100;
-          window.scrollTo({ top: scrollTo, behavior: "smooth" });
+          const offset = id === 'footer' ? document.body.scrollHeight : element.offsetTop - 100;
+          window.scrollTo({ top: offset, behavior: 'smooth' });
         }
       }, 100);
+    } else {
+      // No hash: scroll to top after the DOM has updated
+      requestAnimationFrame(() => {
+        scrollAllToTop();
+      });
     }
-  }, [location]);
+  }, [location]); // runs on every route change
 
   return null;
 }
@@ -426,7 +460,7 @@ export default function App() {
                 </div>
               </>
             )}
-            <ScrollToHash />
+            <ScrollController />
             <main className={`tw-flex-1 ${isProductsPage && !isAdminDashboard ? "tw-pt-[60px]" : ""}`}>
               <Suspense fallback={
                 <div className="tw-flex tw-justify-center tw-items-center tw-h-40">
@@ -451,6 +485,9 @@ export default function App() {
                   <Route path="/sea-freight" element={<SeaFreight />} />
                   <Route path="/join-us" element={<JoinUs />} />
                   <Route path="/cart" element={<Cart />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsAndConditions />} />
+                  <Route path="/shipping-policy" element={<ShippingPolicy />} />
                   <Route
                     path="/admin/*"
                     element={

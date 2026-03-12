@@ -1,19 +1,16 @@
-// src/admin/Dashboard.jsx - Dashboard with charts + new order alert
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ref, onValue, off, query, limitToLast } from "firebase/database";
-import { db } from "../../firebase";         // Users, Products, Services
-// import { db as dbQuote } from "../../firebasequote";   // Orders & Quotes
+import { db } from "../../firebase";
 
-// Recharts for charts
+
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
   BarChart, Bar
 } from "recharts";
 
-const ALERT_BEEP_BASE64 = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA..."; // short placeholder
-// NOTE: above is placeholder. Browser will accept short silent beep; replace if you want.
+const ALERT_BEEP_BASE64 = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA...";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -28,26 +25,26 @@ export default function Dashboard() {
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Charts data
-  const [orders7Days, setOrders7Days] = useState([]); // { day: 'Mon', count: 3 }
-  const [pieData, setPieData] = useState([]); // [{ name: 'Bulk', value: 10 }, ...]
-  const [statusData, setStatusData] = useState([]); // [{ status: 'Pending', value: 5 }, ...]
 
-  // UI highlight state for new orders
+  const [orders7Days, setOrders7Days] = useState([]);
+  const [pieData, setPieData] = useState([]);
+  const [statusData, setStatusData] = useState([]);
+
+  
   const [newOrderFlash, setNewOrderFlash] = useState(false);
   const prevTotalOrdersRef = useRef(0);
   const audioRef = useRef(null);
   const quotesListenerRef = useRef(null);
 
   useEffect(() => {
-    // prepare audio
+    
     audioRef.current = typeof Audio !== "undefined" ? new Audio(ALERT_BEEP_BASE64) : null;
   }, []);
 
   useEffect(() => {
     const unsubs = [];
 
-    // MAIN DB: Users, Products, Services
+    
     unsubs.push(onValue(ref(db, "users"), (snap) => {
       const count = snap.exists() ? Object.keys(snap.val() || {}).length : 0;
       setStats(prev => ({ ...prev, totalUsers: count }));
@@ -68,26 +65,22 @@ export default function Dashboard() {
       setStats(prev => ({ ...prev, totalServices: total }));
     }));
 
-    // QUOTE DB: listen to entire quotes node (bulk & sample combined)
+    
     const quotesRef = query(ref(db, "quotes"), limitToLast(300));
     quotesListenerRef.current = (snap) => {
       const raw = snap.val() || {};
 
-      // Convert nested structure into flat list
-      // There may be two patterns:
-      // 1) quotes/{quoteId} => order (legacy single root)
-      // 2) quotes/bulk/{id} and quotes/sample_courier/{id}
-      // Handle both cases.
+
       let flat = [];
 
-      // Case A: top-level children are buckets (bulk, sample_courier) OR direct orders
+
       Object.entries(raw).forEach(([k, v]) => {
-        // If child is an object whose values are objects with timestamps -> treat as bucket
+        
         if (v && typeof v === "object" && !Array.isArray(v)) {
           const maybeBucketValues = Object.values(v);
           const isBucket = maybeBucketValues.length > 0 && maybeBucketValues.every(x => typeof x === "object" && ("timestamp" in x || Object.keys(x).length > 0));
           if (isBucket) {
-            // bucket case: entries are orders
+            
             Object.entries(v).forEach(([id, order]) => {
               flat.push({
                 id,
@@ -99,7 +92,7 @@ export default function Dashboard() {
             return;
           }
         }
-        // fallback: treat k as order id and v as order
+        
         if (v && typeof v === "object") {
           flat.push({
             id: k,
@@ -110,7 +103,7 @@ export default function Dashboard() {
         }
       });
 
-      // Remove duplicates by id (keep latest)
+      
       const byId = {};
       flat.forEach(o => {
         if (!o.id) return;
@@ -118,16 +111,16 @@ export default function Dashboard() {
       });
       flat = Object.values(byId);
 
-      // Sort descending
+      
       flat.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-      // Stats
+      
       const total = flat.length;
       const pending = flat.filter(o => !o.status || o.status === "Pending").length;
       const todayStart = new Date().setHours(0, 0, 0, 0);
       const todayCount = flat.filter(o => (o.timestamp || 0) >= todayStart).length;
 
-      // Recent activity
+      
       const recent = flat.slice(0, 6).map(o => ({
         id: o.id,
         action: (o.type === "sample_courier" || (o.type && o.type.includes("sample"))) ? "Sample Courier Request" : "Bulk Quote Request",
@@ -136,22 +129,22 @@ export default function Dashboard() {
         status: o.status || "Pending",
       }));
 
-      // Charts data preparation
+      
       setOrders7Days(calc7DayCounts(flat));
       setPieData(calcTypePie(flat));
       setStatusData(calcStatusCounts(flat));
 
-      // Detect new orders
+      
       const prevTotal = prevTotalOrdersRef.current || 0;
       if (total > prevTotal) {
-        // play sound and flash
+        
         try { audioRef.current?.play?.(); } catch (e) { /* ignore autoplay errors */ }
         setNewOrderFlash(true);
         setTimeout(() => setNewOrderFlash(false), 2500);
       }
       prevTotalOrdersRef.current = total;
 
-      // update state
+      
       setStats(prev => ({ ...prev, totalOrders: total, pendingQuotes: pending, todayOrders: todayCount }));
       setRecentActivity(recent);
       setLoading(false);
@@ -159,31 +152,31 @@ export default function Dashboard() {
 
     onValue(quotesRef, quotesListenerRef.current);
 
-    // cleanup
+    
     return () => {
       unsubs.forEach(fn => fn());
       if (quotesRef && quotesListenerRef.current) off(quotesRef, "value", quotesListenerRef.current);
     };
   }, []);
 
-  // helpers
+  
   const inferTypeFromBucketKey = (bucketKey, order) => {
     if (!bucketKey) return order?.type || "bulk";
     if (bucketKey.toLowerCase().includes("sample")) return "sample_courier";
     if (bucketKey.toLowerCase().includes("bulk")) return "bulk";
-    // fallback to order.type or bulk
+    
     return order?.type || "bulk";
   };
 
   const inferTypeFromOrder = (order) => {
     if (!order) return "bulk";
     if ((order.type || "").toLowerCase().includes("sample")) return "sample_courier";
-    if (order.items || order.items?.length) return "sample_courier"; // heuristic: sample has items array
+    if (order.items || order.items?.length) return "sample_courier"; 
     return "bulk";
   };
 
   const getNameFromOrder = (o) => {
-    // Common fields to search for name
+    
     return o?.name || o?.fullName || o?.full_name || o?.displayName || o?.customerName || o?.company || o?.email || "No Name";
   };
 
@@ -244,7 +237,7 @@ export default function Dashboard() {
     return date.toLocaleDateString();
   };
 
-  // Navigation paths for each card
+  
   const handleCardClick = (cardType) => {
     switch (cardType) {
       case "users":
@@ -270,7 +263,7 @@ export default function Dashboard() {
     }
   };
 
-  // RESTORED ORIGINAL STAT CARDS WITH TWO-LINE LABELS - NOW CLICKABLE
+  
   const statCards = [
     {
       label: ["Total", "Users"],
@@ -324,12 +317,12 @@ export default function Dashboard() {
     },
   ];
 
-  // Colors for pie chart
+  
   const PIE_COLORS = ["#F59E0B", "#06B6D4"]; // yellow, cyan
 
   return (
     <div className="tw-space-y-6 sm:tw-space-y-8 md:tw-space-y-10 tw-p-2 sm:tw-p-4">
-      {/* Welcome */}
+      
       <div className="tw-text-center tw-px-2">
         <h1 className="
           tw-font-bold
@@ -344,7 +337,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Stats Grid */}
+      
       <div className="
         tw-grid
         tw-grid-cols-1
@@ -414,9 +407,9 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Charts + Recent Activity Row */}
+      
       <div className="tw-grid tw-grid-cols-1 lg:tw-grid-cols-3 tw-gap-4">
-        {/* 7-day line chart */}
+        
         <div className="tw-bg-gray-900/50 tw-rounded-xl tw-p-4 tw-border tw-border-yellow-600/10">
           <h3 className="tw-text-yellow-400 tw-font-semibold tw-mb-3">Orders - Last 7 Days</h3>
           <div style={{ height: 200 }}>
@@ -432,7 +425,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Pie chart - bulk vs sample */}
+        
         <div className="tw-bg-gray-900/50 tw-rounded-xl tw-p-4 tw-border tw-border-yellow-600/10">
           <h3 className="tw-text-yellow-400 tw-font-semibold tw-mb-3">Bulk vs Sample</h3>
           <div style={{ height: 200 }}>
@@ -448,7 +441,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Status distribution bar chart */}
+        
         <div className="tw-bg-gray-900/50 tw-rounded-xl tw-p-4 tw-border tw-border-yellow-600/10">
           <h3 className="tw-text-yellow-400 tw-font-semibold tw-mb-3">Status Distribution</h3>
           <div style={{ height: 200 }}>
@@ -465,7 +458,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      
       <div className="tw-bg-gray-900/50 tw-backdrop-blur-sm tw-rounded-lg tw-p-4 tw-border tw-border-yellow-600/20">
         <h2 className="tw-text-xl tw-font-bold tw-text-yellow-400 tw-mb-4">Recent Activity</h2>
 

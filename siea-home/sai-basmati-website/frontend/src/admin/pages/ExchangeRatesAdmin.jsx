@@ -21,7 +21,7 @@ const ExchangeRatesAdmin = () => {
   const [editing, setEditing] = useState(null);
   const [editValue, setEditValue] = useState("");
 
-  /* ---------------- AUTH CHECK ---------------- */
+  
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);

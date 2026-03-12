@@ -4,7 +4,7 @@ import { ref, get, set } from "firebase/database";
 import { v4 as uuidv4 } from "uuid";
 import { remove } from "firebase/database";
 
-/* ---------------- EMPTY FORM ---------------- */
+
 const emptyForm = () => ({
   id: uuidv4(),
   Grade: "",
@@ -21,21 +21,21 @@ const emptyForm = () => ({
 });
 
 const CIFRatesAdmin = () => {
-  /* ---------------- STATE ---------------- */
+  
   const [rates, setRates] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // editing: null | "new" | rate.id
+  
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm());
 
-  // filters
+  
   const [search, setSearch] = useState("");
   const [grade, setGrade] = useState("");
   const [country, setCountry] = useState("");
   const [container, setContainer] = useState("");
 
-  /* ---------------- FETCH ONCE ---------------- */
+  
   useEffect(() => {
     const load = async () => {
       const snap = await get(ref(db, "cifRates"));
@@ -52,7 +52,7 @@ const CIFRatesAdmin = () => {
 
     load();
   }, []);
-  /* ---------------- FILTER OPTIONS ---------------- */
+  
   const filters = useMemo(() => {
     const g = new Set(), c = new Set(), cn = new Set();
     rates.forEach(r => {
@@ -67,7 +67,7 @@ const CIFRatesAdmin = () => {
     };
   }, [rates]);
 
-  /* ---------------- FILTERED DATA ---------------- */
+  
   const filteredRates = useMemo(() => {
     return rates.filter(r => {
       const s = search.toLowerCase();
@@ -83,7 +83,7 @@ const CIFRatesAdmin = () => {
     });
   }, [rates, search, grade, country, container]);
 
-  /* ---------------- FORM HANDLERS ---------------- */
+  
   const saveRate = async () => {
     if (!form.Grade || !form.Country || !form.Ex_Mill_Min || !form.Ex_Mill_Max) {
       alert("Grade, Country and CIF are required");
@@ -115,7 +115,7 @@ const CIFRatesAdmin = () => {
     setRates(prev => prev.filter(r => r.id !== id));
   };
 
-  /* ---------------- LOADER ---------------- */
+  
   if (loading) {
     return (
       <div className="tw-min-h-screen tw-flex tw-items-center tw-justify-center tw-bg-black">
@@ -124,11 +124,11 @@ const CIFRatesAdmin = () => {
     );
   }
 
-  /* ---------------- UI ---------------- */
+  
   return (
     <div className="tw-min-h-screen tw-bg-black tw-text-white tw-p-6">
 
-      {/* HEADER */}
+      
       <div className="tw-flex tw-justify-between tw-items-center tw-mb-6">
         <div>
           <h1 className="tw-text-3xl tw-font-bold tw-text-yellow-400">
@@ -150,7 +150,7 @@ const CIFRatesAdmin = () => {
         </button>
       </div>
 
-      {/* FILTER BAR */}
+      
       <div className="tw-grid tw-grid-cols-1 md:tw-grid-cols-4 tw-gap-3 tw-mb-6">
         <input
           placeholder="Search grade / country / port"
@@ -193,7 +193,7 @@ const CIFRatesAdmin = () => {
         </select>
       </div>
 
-      {/* ADD / EDIT FORM */}
+      
       {editing && (
         <div className="tw-bg-gray-900 tw-rounded-lg tw-p-5 tw-mb-6">
           <h3 className="tw-text-yellow-400 tw-font-bold tw-mb-3">
@@ -242,7 +242,7 @@ const CIFRatesAdmin = () => {
         </div>
       )}
 
-      {/* TABLE */}
+
       <div className="tw-bg-gray-900 tw-rounded-lg tw-overflow-x-auto">
         <table className="tw-w-full tw-text-sm">
           <thead className="tw-bg-yellow-600 tw-text-black">

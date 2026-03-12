@@ -1,4 +1,3 @@
-// src/admin/AdminSidebar.jsx
 import React from "react";
 import { NavLink } from "react-router-dom";
 
@@ -28,14 +27,7 @@ export default function AdminSidebar({ onLogout }) {
       tw-border-r tw-border-yellow-500/20
       tw-overflow-y-auto
     ">
-      {/* <h3 className="
-        tw-mb-6 sm:tw-mb-8
-        tw-text-yellow-500 tw-font-bold
-        tw-text-lg sm:tw-text-xl lg:tw-text-2xl
-        tw-text-center
-      ">
-        Admin Panel
-      </h3> */}
+      
 
       <nav className="tw-mb-8">
         <NavLink to="/admin" end style={linkStyle}>
