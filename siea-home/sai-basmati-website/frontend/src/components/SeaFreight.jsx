@@ -150,6 +150,23 @@ const SeaFreight = () => {
         return result;
     };
 
+    const handleWhatsAppCIF = (port) => {
+        const phoneNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
+
+        const message = `Hello,
+
+I need CIF price for:
+
+Destination Port: ${port.name}
+Country: ${selectedCountry}
+Region: ${selectedRegion}
+Container: ${port.container}
+
+Please share CIF price details.`;
+
+        window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`);
+    };
+
     const handleRegionSelect = (region) => {
         setSelectedRegion(region);
         setSelectedCountry(null);
@@ -367,7 +384,7 @@ const SeaFreight = () => {
                                                     )}
 
 
-                                                    <div style={styles.priceContainer}>
+                                                    {/* <div style={styles.priceContainer}>
                                                         {port.cifMin > 0 && port.cifMax > 0 ? (
                                                             <span style={styles.cifPriceRange}>
                                                                 ${port.cifMin.toLocaleString('en-IN')} - ${port.cifMax.toLocaleString('en-IN')}
@@ -381,6 +398,14 @@ const SeaFreight = () => {
                                                                 Price on request
                                                             </span>
                                                         )}
+                                                    </div> */}
+                                                    <div style={{ textAlign: "right" }}>
+                                                        <button
+                                                            style={styles.whatsappButton}
+                                                            onClick={() => handleWhatsAppCIF(port)}
+                                                        >
+                                                            Request CIF Price
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -442,6 +467,17 @@ const styles = {
         fontWeight: "bold",
         marginBottom: "10px",
         color: "#FFD700",
+    },
+    whatsappButton: {
+        background: "linear-gradient(135deg, #FFD700, #e6c200)",
+        color: "#000",
+        border: "none",
+        padding: "8px 16px",
+        borderRadius: "20px",
+        fontSize: "12px",
+        fontWeight: "700",
+        cursor: "pointer",
+        transition: "all 0.3s ease",
     },
 
     subHeading: {

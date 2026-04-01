@@ -41,7 +41,7 @@ export const calculateCIFUSD = (
   country,
   port
 ) => {
-   console.log("CIF FUNCTION CALLED");
+  console.log("CIF FUNCTION CALLED");
   console.log("exMillMin:", exMillMin);
   console.log("exMillMax:", exMillMax);
   const fobMinINR = exMillMin + 4000;
@@ -58,5 +58,18 @@ export const calculateCIFUSD = (
     cifMinUSD: fobMinUSD + freight,
     cifMaxUSD: fobMaxUSD + freight,
     freightUSD: freight,
+  };
+};
+export const calculateFOBUSD = (
+  exMillMin,
+  exMillMax,
+  exchangeRateINR
+) => {
+  const fobMinINR = exMillMin + 4000;
+  const fobMaxINR = exMillMax + 4000;
+
+  return {
+    fobMinUSD: fobMinINR / exchangeRateINR,
+    fobMaxUSD: fobMaxINR / exchangeRateINR,
   };
 };

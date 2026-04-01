@@ -3,8 +3,7 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import { db } from "../firebase";
 import { ref, onValue } from "firebase/database";
 import { useNavigate } from "react-router-dom";
-import { calculateCIFUSD } from "../utils/pricingUtils";
-
+import { calculateFOBUSD } from "../utils/pricingUtils";
 
 
 // Basmati rice names
@@ -181,17 +180,16 @@ const Prices = () => {
   // Get selected destination from localStorage
   const [selectedCifDestination, setSelectedCifDestination] = useState(() => {
     const saved = localStorage.getItem('selectedCifDestination');
-    return saved ? JSON.parse(saved) : {
-      port: "Jebel Ali",
-      country: "UAE",
-      region: "Middle East",
-      container: "20' Container"
-    };
+    return saved ? JSON.parse(saved) : null;
   });
 
   // Save to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('selectedCifDestination', JSON.stringify(selectedCifDestination));
+    if (selectedCifDestination) {
+      localStorage.setItem('selectedCifDestination', JSON.stringify(selectedCifDestination));
+    } else {
+      localStorage.removeItem('selectedCifDestination');
+    }
   }, [selectedCifDestination]);
 
   // Save packing to localStorage
@@ -430,24 +428,17 @@ const Prices = () => {
 
       const {
         fobMinUSD,
-        fobMaxUSD,
-        cifMinUSD,
-        cifMaxUSD
-      } = calculateCIFUSD(
+        fobMaxUSD
+      } = calculateFOBUSD(
         exMillMin,
         exMillMax,
-        exchangeRates.INR,
-        item.Region,
-        item.Country,
-        item["Destination Port"]
+        exchangeRates.INR
       );
 
       grouped[grade].items.push({
         ...item,
         rawFobMinUSD: fobMinUSD,
-        rawFobMaxUSD: fobMaxUSD,
-        rawCifMinUSD: cifMinUSD,
-        rawCifMaxUSD: cifMaxUSD
+        rawFobMaxUSD: fobMaxUSD
       });
     });
 
@@ -474,10 +465,12 @@ const Prices = () => {
         .filter(item => {
 
           const matchesPort =
+            !selectedCifDestination ||
             selectedCifDestination.port === "All Ports" ||
             item["Destination Port"] === selectedCifDestination.port;
 
           const matchesContainer =
+            !selectedCifDestination ||
             selectedCifDestination.container === "All Containers" ||
             item.Container === selectedCifDestination.container;
 
@@ -487,13 +480,10 @@ const Prices = () => {
 
           const adjustedFobMin = item.rawFobMinUSD * packingAdjustment;
           const adjustedFobMax = item.rawFobMaxUSD * packingAdjustment;
-          const adjustedCifMin = item.rawCifMinUSD * packingAdjustment;
-          const adjustedCifMax = item.rawCifMaxUSD * packingAdjustment;
 
           const fobMinPrice = convertSinglePrice(adjustedFobMin, "USD");
           const fobMaxPrice = convertSinglePrice(adjustedFobMax, "USD");
-          const cifMinPrice = convertSinglePrice(adjustedCifMin, "USD");
-          const cifMaxPrice = convertSinglePrice(adjustedCifMax, "USD");
+
 
           return {
             ...item,
@@ -501,10 +491,6 @@ const Prices = () => {
               fobMinPrice === fobMaxPrice
                 ? fobMinPrice
                 : `${fobMinPrice}-${fobMaxPrice}`,
-            cifPrice:
-              cifMinPrice === cifMaxPrice
-                ? cifMinPrice
-                : `${cifMinPrice}-${cifMaxPrice}`
           };
         });
 
@@ -531,7 +517,29 @@ const Prices = () => {
   const [isMobile, setIsMobile] = useState(
     window.innerWidth < 640
   );
+  const handleGetCIFPrice = (item) => {
+    if (!selectedCifDestination || !selectedCifDestination.port) {
+      alert("⚠️ Please select destination first");
+      handleSelectDestination(); // redirect to sea freight
+      return;
+    }
 
+    const phoneNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
+
+    const message = `Hello,
+
+I need CIF price for:
+
+Rice: ${item.Grade}
+Destination: ${selectedCifDestination.port}
+Country: ${selectedCifDestination.country}
+Packing: ${packing}
+Container: ${item.Container}
+
+Please share CIF price.`;
+
+    window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`);
+  };
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 640);
@@ -627,13 +635,53 @@ const Prices = () => {
 
                 <div style={styles.infoNote}>
                   <span style={styles.noteText}>
-                    FOB & CIF Prices in {currency} per metric ton
+                    Export Prices (EX-MILL & FOB)
                   </span>
+                </div>
+
+                {!selectedCifDestination && (
+                  <div style={{ textAlign: "center", marginBottom: "15px" }}>
+                    <button onClick={handleSelectDestination} style={styles.changeDestinationButton}>
+                      Select Destination to Get CIF Price
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ textAlign: "center", marginBottom: "15px" }}>
+                  {selectedCifDestination ? (
+                    <div style={{ color: "#FFD700", fontSize: "14px" }}>
+                      📍 Shipping To: {selectedCifDestination.port}, {selectedCifDestination.country}
+
+                      <button
+                        onClick={handleSelectDestination}
+                        style={{
+                          marginLeft: "10px",
+                          padding: "5px 10px",
+                          background: "#2196F3",
+                          border: "none",
+                          borderRadius: "4px",
+                          color: "#fff",
+                          cursor: "pointer",
+                          fontSize: "12px"
+                        }}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleSelectDestination}
+                      style={styles.changeDestinationButton}
+                    >
+                      🚢 Select Destination
+                    </button>
+                  )}
                 </div>
 
                 {!isMobile && (
                   <div style={styles.tableHeader}>
                     <div style={styles.headerCell}>Rice Grade</div>
+
                     <div style={{ ...styles.headerCell, position: "relative" }} ref={packingDropdownRef}>
                       <div
                         style={styles.packingHeader}
@@ -642,6 +690,7 @@ const Prices = () => {
                         Packing
                         <span style={styles.dropdownArrow}>▼</span>
                       </div>
+
                       {showPackingDropdown && (
                         <div style={styles.packingDropdownContainer}>
                           <div style={styles.packingDropdown}>
@@ -662,21 +711,21 @@ const Prices = () => {
                         </div>
                       )}
                     </div>
-                    <div style={styles.headerCell}>FOB Price<br /><span style={styles.subHeader}>Mundra Port</span></div>
+
                     <div style={styles.headerCell}>
-                      <div style={styles.cifHeader}>
-                        CIF Price
-                        <span
-                          style={styles.cifDropdownArrow}
-                          onClick={handleSelectDestination}
-                          title="Select Destination Port"
-                        >
-                          ▼
-                        </span>
-                      </div>
-                      <div style={styles.destinationSubHeader}>
-                        To: {selectedCifDestination.port}
-                      </div>
+                      EX-MILL<br />
+                      <span style={styles.subHeader}>India</span>
+                    </div>
+
+                    {/* ✅ ADD THIS */}
+                    <div style={styles.headerCell}>
+                      FOB Price<br />
+                      <span style={styles.subHeader}>Mundra Port</span>
+                    </div>
+
+                    {/* ✅ ADD THIS */}
+                    <div style={styles.headerCell}>
+                      Get CIF Price
                     </div>
                   </div>
                 )}
@@ -721,7 +770,12 @@ const Prices = () => {
                               FOB: {currencySymbol}{item.fobPrice}
                             </div>
                             <div style={{ color: "#2196F3", fontWeight: "700", marginTop: "5px" }}>
-                              CIF: {currencySymbol}{item.cifPrice}
+                              <button
+                                style={styles.whatsappButton}
+                                onClick={() => handleGetCIFPrice(item)}
+                              >
+                                Get CIF Price on WhatsApp
+                              </button>
                             </div>
                             <div style={styles.priceUnit}>Per Metric Ton</div>
                             <div style={styles.adjustmentNote}>
@@ -734,7 +788,7 @@ const Prices = () => {
                           key={i}
                           style={{
                             ...styles.tableRow,
-                            gridTemplateColumns: "2fr 1fr 1fr 1fr",
+                            gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
                           }}
                         >
                           <div style={styles.qualityCell}>
@@ -743,11 +797,23 @@ const Prices = () => {
                           <div style={styles.packingCell}>
                             <div style={styles.packingValue}>{packing}</div>
                           </div>
+                          {/* EX-MILL */}
+                          <div style={styles.exMillCell}>
+                            {currency === "INR" ? "₹" : getCurrencySymbol()}
+                            {convertSinglePrice(item.Ex_Mill_Min, "INR")} -
+                            {currency === "INR" ? "₹" : getCurrencySymbol()}
+                            {convertSinglePrice(item.Ex_Mill_Max, "INR")}
+                          </div>
                           <div style={styles.fobCell}>
                             <div style={styles.priceValue}>{currencySymbol}{item.fobPrice}</div>
                           </div>
                           <div style={styles.cifCell}>
-                            <div style={styles.priceValue}>{currencySymbol}{item.cifPrice}</div>
+                            <button
+                              style={styles.whatsappButton}
+                              onClick={() => handleGetCIFPrice(item)}
+                            >
+                              Get CIF Price
+                            </button>
                           </div>
                         </div>
                       );
@@ -763,7 +829,7 @@ const Prices = () => {
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: '20px', color: '#FFD700' }}>
-                No Basmati rice data found for {selectedCifDestination.port}
+                No Basmati rice data found for {selectedCifDestination?.port || "selected destination"}
                 <div style={{ fontSize: '14px', marginTop: '10px', color: '#aaa' }}>
                   <button
                     style={styles.changeDestinationButton}
@@ -775,6 +841,7 @@ const Prices = () => {
               </div>
             )}
 
+
             {processedCifData.nonBasmati.length > 0 && (
               <>
                 <h3 style={styles.sectionTitle}>
@@ -783,7 +850,7 @@ const Prices = () => {
 
                 <div style={styles.infoNote}>
                   <span style={styles.noteText}>
-                    FOB & CIF Prices in {currency} per metric ton
+                    Export Prices (EX-MILL & FOB)
                   </span>
                 </div>
 
@@ -799,21 +866,13 @@ const Prices = () => {
                         <span style={styles.dropdownArrow}>▼</span>
                       </div>
                     </div>
+                    <div style={styles.headerCell}>
+                      EX-MILL<br />
+                      <span style={styles.subHeader}>India</span>
+                    </div>
                     <div style={styles.headerCell}>FOB Price<br /><span style={styles.subHeader}>Mundra Port</span></div>
                     <div style={styles.headerCell}>
-                      <div style={styles.cifHeader}>
-                        CIF Price
-                        <span
-                          style={styles.cifDropdownArrow}
-                          onClick={handleSelectDestination}
-                          title="Select Destination Port"
-                        >
-                          ▼
-                        </span>
-                      </div>
-                      <div style={styles.destinationSubHeader}>
-                        To: {selectedCifDestination.port}
-                      </div>
+                      Get CIF Price
                     </div>
                   </div>
                 )}
@@ -857,9 +916,7 @@ const Prices = () => {
                             <div style={{ color: "#4CAF50", fontWeight: "700" }}>
                               FOB: {currencySymbol}{item.fobPrice}
                             </div>
-                            <div style={{ color: "#2196F3", fontWeight: "700", marginTop: "5px" }}>
-                              CIF: {currencySymbol}{item.cifPrice}
-                            </div>
+
                             <div style={styles.priceUnit}>Per Metric Ton</div>
                             <div style={styles.adjustmentNote}>
                               (Adjusted for {packing} packing)
@@ -871,7 +928,7 @@ const Prices = () => {
                           key={i}
                           style={{
                             ...styles.tableRow,
-                            gridTemplateColumns: "2fr 1fr 1fr 1fr",
+                            gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
                           }}
                         >
                           <div style={styles.qualityCell}>
@@ -880,11 +937,23 @@ const Prices = () => {
                           <div style={styles.packingCell}>
                             <div style={styles.packingValue}>{packing}</div>
                           </div>
+                          {/* EX-MILL */}
+                          <div style={styles.exMillCell}>
+                            {currency === "INR" ? "₹" : getCurrencySymbol()}
+                            {convertSinglePrice(item.Ex_Mill_Min, "INR")} -
+                            {currency === "INR" ? "₹" : getCurrencySymbol()}
+                            {convertSinglePrice(item.Ex_Mill_Max, "INR")}
+                          </div>
                           <div style={styles.fobCell}>
                             <div style={styles.priceValue}>{currencySymbol}{item.fobPrice}</div>
                           </div>
                           <div style={styles.cifCell}>
-                            <div style={styles.priceValue}>{currencySymbol}{item.cifPrice}</div>
+                            <button
+                              style={styles.whatsappButton}
+                              onClick={() => handleGetCIFPrice(item)}
+                            >
+                              Get CIF Price
+                            </button>
                           </div>
                         </div>
                       );
@@ -894,7 +963,7 @@ const Prices = () => {
               </>
             )}
 
-            {processedCifData.basmati.length === 0 && processedCifData.nonBasmati.length === 0 && cifRatesData.length > 0 && (
+            {/* {processedCifData.basmati.length === 0 && processedCifData.nonBasmati.length === 0 && cifRatesData.length > 0 && (
               <div style={styles.varietyCard}>
                 <h3 style={styles.sectionTitle}>
                   ALL CIF RATES <span style={styles.goldLine}></span>
@@ -949,7 +1018,7 @@ const Prices = () => {
                   );
                 })}
               </div>
-            )}
+            )} */}
           </>
         ) : (
           <>
@@ -1115,6 +1184,14 @@ const styles = {
     border: "none",
     fontSize: "13px",
   },
+  exMillCell: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    color: "#FFD700",
+    fontWeight: "700",
+    fontSize: "14px",
+  },
 
   card: {
     background: "#0d0d0d",
@@ -1130,6 +1207,20 @@ const styles = {
     textAlign: "center",
   },
 
+  whatsappButton: {
+    background: "transparent",
+    color: "#FFD700",
+    border: "1px solid #FFD700",
+    padding: "6px 12px",
+    borderRadius: "20px",
+    fontSize: "12px",
+    fontWeight: "600",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+  }, "&:hover": {
+    background: "#FFD700",
+    color: "#000",
+  },
   subTitle: {
     fontSize: "14px",
     color: "#FFD700",
@@ -1184,7 +1275,7 @@ const styles = {
 
   tableHeader: {
     display: "grid",
-    gridTemplateColumns: "2fr 1fr 1fr 1fr",
+    gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
     gap: "12px",
     padding: "12px 15px",
     background: "#252525",

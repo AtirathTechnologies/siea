@@ -377,25 +377,9 @@ const BuyModal = ({
 
       } else {
 
-        if (cif === "Yes") {
-
-          if (selectedDestination && selectedDestination.port) {
-
-            const cifUSDPerTon = parseFloat(selectedDestination.cifUSD || 0);
-            const cifINRPerTon = cifUSDPerTon * exchangeRates.USD;
-
-            fPriceINR = cifINRPerTon * totalWeightInTons;
-
-            totalINR = cartTotalINR + pPriceINR + fPriceINR;
-          } else {
-
-
-            totalINR = cartTotalINR + pPriceINR + lPriceINR + fPriceINR;
-          }
-
-        } else {
-          totalINR = cartTotalINR + pPriceINR + lPriceINR;
-        }
+        // ✅ FOB only
+        totalINR = cartTotalINR + pPriceINR;
+        fPriceINR = 0;
       }
 
       setGradePriceINR(0);
@@ -441,37 +425,9 @@ const BuyModal = ({
 
       } else {
 
-        if (cif === "Yes") {
-
-          if (selectedDestination && selectedDestination.port) {
-
-            const result = calculateCIFUSD(
-              selectedDestination.exMillMin,
-              selectedDestination.exMillMax,
-              exchangeRates.USD,
-              selectedDestination.region,
-              selectedDestination.country,
-              selectedDestination.port
-            );
-
-            // Use MAX to match mobile
-            const cifUSDPerTon = result.cifMaxUSD;
-
-            const cifINRPerTon = cifUSDPerTon * exchangeRates.USD;
-
-            fPriceINR = cifINRPerTon * totalWeightInTons;
-
-            totalINR = qPriceINR + pPriceINR + fPriceINR;
-          } else {
-
-
-            totalINR = qPriceINR + pPriceINR + fPriceINR;
-          }
-
-        } else {
-
-          totalINR = qPriceINR + pPriceINR + lPriceINR;
-        }
+        // ✅ ALWAYS FOB ONLY (ignore CIF completely)
+        totalINR = qPriceINR + pPriceINR;
+        fPriceINR = 0;
       }
 
       setGradePriceINR(basePricePerQtlINR);
@@ -1017,11 +973,11 @@ const BuyModal = ({
                             </button>
                           </div>
 
-                          {cifPriceUSD > 0 && (
+                          {/* {cifPriceUSD > 0 && (
                             <div className="tw-mt-2 tw-text-yellow-300 tw-text-xs">
                               CIF rate: {currencySymbol}{cifPriceConverted.toFixed(2)}/MT
                             </div>
-                          )}
+                          )} */}
                         </>
                       ) : (
                         <button
@@ -1088,7 +1044,7 @@ const BuyModal = ({
                   </div>
                 )}
 
-                {!isDomestic && cif === "Yes" && selectedDestination && (
+                {/* {!isDomestic && cif === "Yes" && selectedDestination && (
                   <>
                     <div className="bill-item tw-text-yellow-400">
                       <span>
@@ -1101,7 +1057,7 @@ const BuyModal = ({
 
                     <div className="tw-border-t tw-border-yellow-400/40 tw-my-2"></div>
                   </>
-                )}
+                )} */}
 
 
                 <div className="bill-item">
@@ -1114,7 +1070,7 @@ const BuyModal = ({
                   <span>{currencySymbol}{displayQuantityPrice.toFixed(2)}</span>
                 </div>
 
-                {!isDomestic && cif === "Yes" && selectedDestination && totalWeightInTons > 0 && (
+                {/* {!isDomestic && cif === "Yes" && selectedDestination && totalWeightInTons > 0 && (
                   <div className="bill-item tw-text-yellow-300">
                     <span>
                       CIF Freight ({totalWeightInTons.toFixed(2)} MT):
@@ -1123,7 +1079,7 @@ const BuyModal = ({
                       {currencySymbol}{displayFreightPrice.toFixed(2)}
                     </span>
                   </div>
-                )}
+                )} */}
 
 
 
@@ -1140,11 +1096,17 @@ const BuyModal = ({
 
                 <div className="bill-item total">
                   <span>{t("total_price")}:</span>
-                  <span>{currencySymbol}{displayTotalPrice.toFixed(2)} ({cif === "Yes" ? t("cif_term") : t("fob_term")})</span>
+                  <span>{currencySymbol}{displayTotalPrice.toFixed(2)} (FOB)</span>
                 </div>
               </div>
-              <div className="tw-mt-4 tw-text-xs tw-text-white-400 tw-leading-relaxed">
-                <strong>{t("NOTE")} : {t("This is an estimated cost. Actual costs may vary based on additional requirements and market conditions.")}</strong>
+              <div className="tw-mt-4 tw-text-xs tw-text-yellow-400 tw-leading-relaxed">
+                <strong>NOTE:</strong><br />
+
+                • This is an estimated cost. Actual costs may vary based on market conditions.<br />
+
+                • CIF price is not displayed here.<br />
+
+                • To get exact CIF price, please request via WhatsApp after submitting your enquiry.
               </div>
             </div>
           </div>
