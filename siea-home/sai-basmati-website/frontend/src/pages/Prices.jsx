@@ -528,15 +528,15 @@ const Prices = () => {
 
     const message = `Hello,
 
-I need CIF price for:
+    I need CIF price for:
 
-Rice: ${item.Grade}
-Destination: ${selectedCifDestination.port}
-Country: ${selectedCifDestination.country}
-Packing: ${packing}
-Container: ${item.Container}
+    Rice: ${item.Grade}
+    Destination: ${selectedCifDestination.port}
+    Country: ${selectedCifDestination.country}
+    Packing: ${packing}
+    Container: ${item.Container}
 
-Please share CIF price.`;
+    Please share CIF price.`;
 
     window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`);
   };

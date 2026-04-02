@@ -155,14 +155,14 @@ const SeaFreight = () => {
 
         const message = `Hello,
 
-I need CIF price for:
+        I need CIF price for:
 
-Destination Port: ${port.name}
-Country: ${selectedCountry}
-Region: ${selectedRegion}
-Container: ${port.container}
+        Destination Port: ${port.name}
+        Country: ${selectedCountry}
+        Region: ${selectedRegion}
+        Container: ${port.container}
 
-Please share CIF price details.`;
+        Please share CIF price details.`;
 
         window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`);
     };

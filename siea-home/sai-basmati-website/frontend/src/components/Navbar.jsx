@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import logoUrl from "../assets/logo.svg";
+import logoUrl from "../assets/SIEA.svg";
+import logoUrl1 from "../assets/AANAK_Logo.svg";
 import { useLanguage } from "../contexts/LanguageContext";
 import { otherServices } from "../data/services";
 
@@ -112,8 +113,9 @@ export default function Navbar({ profile, setProfile, handleLogout, onProfileCli
     <nav className="tw-sticky tw-top-0 tw-z-50 tw-py-3 tw-backdrop-blur-md tw-bg-black/20 tw-shadow-lg">
       <div className="tw-flex tw-justify-between tw-items-center tw-w-full tw-px-4 lg:tw-px-6">
         <NavLink to="/" className="tw-flex tw-items-center tw-gap-2 tw-no-underline" onClick={closeMenu}>
-          <img src={logoUrl} alt="Sai Import Exports & Agro" width="36" height="36" className="tw-block" />
-          <span className="tw-font-bold tw-text-yellow-400 tw-text-lg">{t("brand")}</span>
+          <img src={logoUrl} alt="Sai Import Exports & Agro" width="60" height="40" className="tw-block" />
+          <img src={logoUrl1} alt="Sai Import Exports & Agro" width="60" height="40" className="tw-block" />
+          {/* <span className="tw-font-bold tw-text-yellow-400 tw-text-lg">{t("brand")}</span> */}
         </NavLink>
 
         <button

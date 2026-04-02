@@ -32,10 +32,33 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
   const [isThankYouOpen, setIsThankYouOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
   const [showRssFeed, setShowRssFeed] = useState(true);
   const [detailsProduct, setDetailsProduct] = useState(null);
   const productsContainerRef = useRef(null);
   const [exchangeRates, setExchangeRates] = useState({});
+
+  const showBuyQuery = (productId, type = "buy") => {
+    const product = allProducts.find(
+      (p) => p.firebaseId === productId || p.id === productId
+    );
+
+    if (!product) return;
+
+    // DETAILS CLICK
+    if (type === "details") {
+      setIsSidebarOpen(false);
+      setShowRssFeed(false);
+      setDetailsProduct(product);
+    }
+    // BUY CLICK
+    else {
+      setSelectedProduct(product);
+      setIsBuyModalOpen(true);
+    }
+  };
 
   useEffect(() => {
     const fetchRates = async () => {
@@ -175,17 +198,40 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
     let filtered = allProducts;
 
     if (filteredCategory !== "All") {
-      filtered = filtered.filter(p => p.category === filteredCategory);
+      filtered = filtered.filter((p) => {
+        if (!p) return false;
+
+        // ✅ Basmati (exclude AANAK)
+        if (filteredCategory === "Basmati Rice") {
+          return (
+            p.category === "Basmati Rice" &&
+            (!p.brand || p.brand !== "AANAK")
+          );
+        }
+
+        // ✅ Non-Basmati
+        if (filteredCategory === "Non Basmati Rice") {
+          return p.category === "Non Basmati Rice";
+        }
+
+        // ✅ AANAK only
+        if (filteredCategory === "AANAK") {
+          return p.brand === "AANAK";
+        }
+
+        return true;
+      });
     }
 
+    // SEARCH
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
 
-      filtered = filtered.filter(p =>
-        Object.values(p.name || {}).some(v =>
+      filtered = filtered.filter((p) =>
+        Object.values(p.name || {}).some((v) =>
           v?.toLowerCase().includes(q)
         ) ||
-        Object.values(p.desc || {}).some(v =>
+        Object.values(p.desc || {}).some((v) =>
           v?.toLowerCase().includes(q)
         )
       );
@@ -193,31 +239,6 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
 
     setFilteredProducts(filtered);
   }, [filteredCategory, searchQuery, allProducts]);
-
-  // Unified handler for "Buy" or "Details" from the product card
-  const showBuyQuery = (productId, type = "buy") => {
-    const product = allProducts.find(
-      p => p.firebaseId === productId || p.id === productId
-    );
-
-    if (type === "details") {
-      setIsSidebarOpen(false);
-      setShowRssFeed(false);
-      setDetailsProduct(product);
-    } else {
-      setSelectedProduct(product);
-      setIsBuyModalOpen(true);
-    }
-  };
-
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-
-  useEffect(() => {
-    if (exchangeRates.USD) {
-      setCurrency("INR"); // default
-    }
-  }, [exchangeRates]);
-
   return (
     <div className="flex flex-1">
       <div className={showRssFeed ? "" : "tw-hidden"}>
