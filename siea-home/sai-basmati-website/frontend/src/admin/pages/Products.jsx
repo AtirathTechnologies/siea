@@ -11,6 +11,7 @@ export default function ProductsAdmin() {
   const [expandedGrades, setExpandedGrades] = useState({});
   const [selectedHistoryRecord, setSelectedHistoryRecord] = useState(null);
   const addFormRef = React.useRef(null);
+  const [loading, setLoading] = useState(true);
 
 
   const emptyProduct = {
@@ -36,51 +37,84 @@ export default function ProductsAdmin() {
 
   const calculatePriceRange = (grades) => {
     if (!grades || grades.length === 0) {
-      return "₹0-0 per qtls";
+      return "₹0-0";
     }
 
-    const minPrice = Math.min(...grades.map(g => g.price_inr * 100));
-    const maxPrice = Math.max(...grades.map(g => g.price_inr * 100));
+    let allPrices = [];
+    let isPackBased = false;
 
-    return `₹${minPrice.toLocaleString('en-IN')}-${maxPrice.toLocaleString('en-IN')} per qtls`;
+    grades.forEach(g => {
+      // ✅ SIEA (price_inr)
+      if (g.price_inr !== undefined) {
+        allPrices.push((Number(g.price_inr) || 0) * 100);
+      }
+
+      // ✅ AANAK (packs)
+      if (g.packs && Array.isArray(g.packs)) {
+        isPackBased = true;
+        g.packs.forEach(p => {
+          allPrices.push(Number(p.price) || 0);
+        });
+      }
+    });
+
+    if (allPrices.length === 0) return "₹0-0";
+
+    const minPrice = Math.min(...allPrices);
+    const maxPrice = Math.max(...allPrices);
+
+    // ✅ dynamic unit
+    const unit = isPackBased ? "per packs" : "per qtls";
+
+    return `₹${minPrice.toLocaleString('en-IN')}-${maxPrice.toLocaleString('en-IN')} ${unit}`;
   };
 
   useEffect(() => {
     const prodRef = ref(db, "products");
-    onValue(prodRef, (snapshot) => {
+
+    const unsubscribe = onValue(prodRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
+        let productsArray = [];
 
-        // Convert Firebase object to array with keys
-        const productsArray = Object.entries(data).map(([key, product]) => ({
-          firebaseKey: key,
-          id: product.id || key,
-          ...product,
-          price: calculatePriceRange(product.grades || [])
-        }));
+        Object.entries(data).forEach(([brand, brandProducts]) => {
+          Object.entries(brandProducts).forEach(([key, product]) => {
+            productsArray.push({
+              firebaseKey: `${brand}/${key}`,
+              id: product.id || key,
+              brand,
+              ...product,
+              price: calculatePriceRange(product.grades || [])
+            });
+          });
+        });
 
         setProducts(productsArray);
       } else {
         setProducts([]);
       }
+      setLoading(false);
     });
+
+    return () => unsubscribe(); // ✅ cleanup
   }, []);
 
-  const toggleGrades = (id) => {
-    setExpandedGrades((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleGrades = (key) => {
+    setExpandedGrades(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
 
   const startEdit = (product) => {
     if (product === "new") {
       setEditing("new");
-      setForm({ ...emptyProduct });
+      setForm({ ...emptyProduct, brand: "SIEA" });
 
       setTimeout(() => {
         addFormRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
     }
     else {
-      setEditing(product.id);
+      setEditing(product.firebaseKey);
       // Make a fresh copy of the product for editing
       const productCopy = JSON.parse(JSON.stringify(product));
       const calculatedPrice = productCopy.grades && productCopy.grades.length > 0
@@ -94,7 +128,7 @@ export default function ProductsAdmin() {
 
       setExpandedGrades(prev => ({
         ...prev,
-        [product.id]: true
+        [product.firebaseKey]: true
       }));
     }
   };
@@ -103,7 +137,7 @@ export default function ProductsAdmin() {
     if (!products || products.length === 0) return "1";
 
     const numericIds = products
-      .map(p => parseInt(p.firebaseKey || p.id))
+      .map(p => parseInt(p.id)) // ✅ use only id
       .filter(n => !isNaN(n));
 
     const maxId = Math.max(...numericIds, 0);
@@ -247,10 +281,14 @@ export default function ProductsAdmin() {
       return;
     }
 
-    // DEEP COPY of the original product BEFORE modifications
-    const originalProduct = JSON.parse(JSON.stringify(
-      products.find(p => p.id === id)
-    ));
+    const foundProduct = products.find(p => p.firebaseKey === firebaseKey);
+
+    if (!foundProduct) {
+      alert("❌ Product not found!");
+      return;
+    }
+
+    const originalProduct = JSON.parse(JSON.stringify(foundProduct));
 
     // Prepare the new data
     const finalForm = {
@@ -284,7 +322,7 @@ export default function ProductsAdmin() {
       await update(ref(db, `products/${firebaseKey}`), dataToSave);
       alert("✅ Product saved successfully!");
       setEditing(null);
-      setExpandedGrades(prev => ({ ...prev, [id]: false }));
+      setExpandedGrades(prev => ({ ...prev, [firebaseKey]: false }));
     } catch (error) {
       console.error("Error saving product:", error);
       alert("❌ Error saving product: " + error.message);
@@ -292,7 +330,10 @@ export default function ProductsAdmin() {
   };
 
   const addProduct = async () => {
-    const newKey = getNextProductKey(products);
+    const brand = form.brand || "SIEA"; // default
+
+    const brandProducts = products.filter(p => p.brand === brand);
+    const newKey = getNextProductKey(brandProducts);
 
     const finalForm = {
       ...form,
@@ -303,27 +344,15 @@ export default function ProductsAdmin() {
     };
 
     try {
-      const user = auth.currentUser;
-
-      await logHistory({
-        path: `products/${newKey}`,
-        entity: "PRODUCT",
-        action: "CREATE",
-        before: null, // No data before creation
-        after: finalForm, // Only the new data
-        actor: user?.email || "Unknown",
-        actorUid: user?.uid || null,
-        actorRole: "admin"
-      });
-
-      await set(ref(db, `products/${newKey}`), finalForm);
+      await set(ref(db, `products/${brand}/${newKey}`), finalForm);
       alert("✅ New product added!");
       setEditing(null);
     } catch (error) {
-      console.error("Error adding product:", error);
-      alert("❌ Error adding product: " + error.message);
+      console.error(error);
     }
   };
+
+
 
   const deleteProduct = async (firebaseKey, productId) => {
     if (window.confirm("⚠️ Delete this product permanently?")) {
@@ -355,18 +384,33 @@ export default function ProductsAdmin() {
   };
 
   const addGrade = () => {
-    const newGrade = {
-      grade: "New Grade",
-      harvest: "Nov 2024",
-      moq: 5000,
-      origin: "Punjab",
-      price_inr: 100,
-      stock: "Medium",
-    };
+    const isAANAK = form.brand === "AANAK";
+
+    const newGrade = isAANAK
+      ? {
+        grade: "New Grade",
+        packs: [{ size: 5, price: 0 }],
+        moq: 5000,
+        origin: "Punjab",
+        stock: "Medium",
+      }
+      : {
+        grade: "New Grade",
+        price_inr: 100,
+        moq: 5000,
+        origin: "Punjab",
+        stock: "Medium",
+      };
 
     const updatedGrades = [...(form.grades || []), newGrade];
     updateFormWithGrades(updatedGrades);
   };
+
+  const isPackBased = (grade) => {
+    return Array.isArray(grade?.packs) && grade.packs.length > 0;
+  };
+
+
 
   const updateGrade = (index, field, value) => {
     const updatedGrades = [...form.grades];
@@ -380,37 +424,88 @@ export default function ProductsAdmin() {
   };
 
   const cancelEdit = () => {
+    const currentKey = editing; // ✅ capture first
     setEditing(null);
-    if (editing !== "new") {
-      setExpandedGrades(prev => ({ ...prev, [editing]: false }));
+
+    if (currentKey && currentKey !== "new") {
+      setExpandedGrades(prev => ({ ...prev, [currentKey]: false }));
     }
   };
 
   const renderPricePreview = (grades) => {
     if (!grades || grades.length === 0) {
-      return <span style={{ color: "#888", fontStyle: "italic", fontSize: "14px" }}>No grades added</span>;
+      return (
+        <span style={{ color: "#888", fontStyle: "italic", fontSize: "14px" }}>
+          No grades added
+        </span>
+      );
     }
 
-    const prices = grades.map(g => g.price_inr * 100);
+    const prices = [];
+    let isPackBased = false;
+
+    grades.forEach(g => {
+      // ✅ SIEA price (₹/kg → convert to quintal)
+      if (g.price_inr !== undefined) {
+        const price = Number(g.price_inr);
+        if (!isNaN(price) && price > 0) {
+          prices.push(price * 100);
+        }
+      }
+
+      // ✅ AANAK pack prices
+      if (g.packs && Array.isArray(g.packs)) {
+        isPackBased = true;
+        g.packs.forEach(p => {
+          const price = Number(p.price);
+          if (!isNaN(price) && price > 0) {
+            prices.push(price);
+          }
+        });
+      }
+    });
+
+    // ✅ CRITICAL FIX (no crash)
+    if (prices.length === 0) {
+      return (
+        <span style={{ color: "#888", fontStyle: "italic", fontSize: "14px" }}>
+          No valid prices
+        </span>
+      );
+    }
+
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
+    const unit = isPackBased ? "per packs" : "per qtls";
 
     return (
-      <div style={{
-        marginTop: 10,
-        padding: 8,
-        background: "#1a1a1a",
-        borderRadius: 6,
-        border: "1px dashed #444",
-        fontSize: "14px"
-      }}>
-        <div style={{ fontSize: 13, color: "#aaa" }}>Price Preview:</div>
-        <div style={{ fontSize: 16, fontWeight: "bold", color: "#FFD700" }}>
-          ₹{minPrice.toLocaleString('en-IN')} - ₹{maxPrice.toLocaleString('en-IN')} per qtls
+      <div
+        style={{
+          marginTop: 10,
+          padding: 10,
+          background: "#1a1a1a",
+          borderRadius: 8,
+          border: "1px dashed #444",
+          fontSize: "14px",
+        }}
+      >
+        <div style={{ fontSize: 13, color: "#aaa" }}>💰 Price Preview</div>
+
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: "bold",
+            color: "#FFD700",
+            marginTop: 4,
+          }}
+        >
+          ₹{minPrice.toLocaleString("en-IN")} - ₹{maxPrice.toLocaleString("en-IN")}{" "}
+          {unit}
         </div>
+
         <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-          Based on {grades.length} grade{grades.length !== 1 ? 's' : ''}
-          ({minPrice === maxPrice ? 'Fixed price' : 'Range'})
+          Based on {grades.length} grade{grades.length !== 1 ? "s" : ""} •{" "}
+          {minPrice === maxPrice ? "Fixed price" : "Price range"}
         </div>
       </div>
     );
@@ -424,7 +519,7 @@ export default function ProductsAdmin() {
         tw-gap-2 sm:tw-gap-3 md:tw-gap-4
         tw-mt-2 sm:tw-mt-0
       ">
-        {editing === product.id ? (
+        {editing === product.firebaseKey ? (
           <>
             <button onClick={saveProduct} style={saveBtn}>💾 Save</button>
             <button onClick={cancelEdit} style={cancelBtn}>❌ Cancel</button>
@@ -434,10 +529,10 @@ export default function ProductsAdmin() {
             <button onClick={() => startEdit(product)} style={editBtn}>✏️ Edit</button>
             <button onClick={() => deleteProduct(product.firebaseKey, product.id)} style={deleteBtn}>🗑️ Delete</button>
             <button
-              onClick={() => toggleGrades(product.id)}
+              onClick={() => toggleGrades(product.firebaseKey)}
               style={gradesBtn}
             >
-              {expandedGrades[product.id] ? "📕 Hide" : "📘 Show"} Grades ({product.grades?.length || 0})
+              {expandedGrades[product.firebaseKey] ? "📕 Hide" : "📘 Show"} Grades ({product.grades?.length || 0})
             </button>
           </>
         )}
@@ -942,7 +1037,7 @@ export default function ProductsAdmin() {
 
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  {editing === p.id ? (
+                  {editing === p.firebaseKey ? (
                     <>
                       <input
                         value={form.name?.en || ""}
@@ -1003,7 +1098,7 @@ export default function ProductsAdmin() {
               </div>
 
               {/* Grades Section */}
-              {(expandedGrades[p.id] || editing === p.id) && (
+              {(expandedGrades[p.firebaseKey] || editing === p.firebaseKey) && (
                 <div style={{
                   padding: "16px",
                   borderTop: "1px dashed #333",
@@ -1023,14 +1118,14 @@ export default function ProductsAdmin() {
                     }}>
                       📊 Grades
                     </h4>
-                    {editing === p.id && (
+                    {editing === p.firebaseKey && (
                       <button onClick={addGrade} style={addGradeBtn}>
                         ➕ Add Grade
                       </button>
                     )}
                   </div>
 
-                  {editing === p.id ? (
+                  {editing === p.firebaseKey ? (
                     <div>
                       {renderPricePreview(form.grades)}
                       {renderSpecsEditor()}
@@ -1053,13 +1148,58 @@ export default function ProductsAdmin() {
                                   style={gradeInput}
                                   placeholder="Origin"
                                 />
-                                <input
-                                  type="number"
-                                  value={g.price_inr}
-                                  onChange={(e) => updateGrade(i, "price_inr", Number(e.target.value) || 0)}
-                                  style={{ ...gradeInput, background: g.price_inr > 0 ? "#1a2a1a" : "#222" }}
-                                  placeholder="Price (₹/kg)"
-                                />
+                                {isPackBased(g) ? (
+                                  <div style={{ width: "100%" }}>
+                                    {g.packs.map((p, pi) => (
+                                      <div key={pi} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+
+                                        <input
+                                          type="number"
+                                          value={p.size}
+                                          placeholder="Size (kg)"
+                                          onChange={(e) => {
+                                            const updated = [...form.grades];
+                                            updated[i].packs[pi].size = Number(e.target.value);
+                                            updateFormWithGrades(updated);
+                                          }}
+                                          style={{ ...gradeInput, width: "40%" }}
+                                        />
+
+                                        <input
+                                          type="number"
+                                          value={p.price}
+                                          placeholder="Price"
+                                          onChange={(e) => {
+                                            const updated = [...form.grades];
+                                            updated[i].packs[pi].price = Number(e.target.value);
+                                            updateFormWithGrades(updated);
+                                          }}
+                                          style={{ ...gradeInput, width: "60%" }}
+                                        />
+
+                                      </div>
+                                    ))}
+
+                                    <button
+                                      onClick={() => {
+                                        const updated = [...form.grades];
+                                        updated[i].packs.push({ size: 5, price: 0 });
+                                        updateFormWithGrades(updated);
+                                      }}
+                                      style={addGradeBtn}
+                                    >
+                                      ➕ Add Pack
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="number"
+                                    value={g.price_inr}
+                                    onChange={(e) => updateGrade(i, "price_inr", Number(e.target.value) || 0)}
+                                    placeholder="Price (₹/kg)"
+                                    style={gradeInput}
+                                  />
+                                )}
                                 <input
                                   type="number"
                                   value={g.moq}
@@ -1110,7 +1250,14 @@ export default function ProductsAdmin() {
                           <div style={{ fontSize: "14px", color: "#ccc", marginTop: 8 }}>
                             <div>📍 Origin: {g.origin}</div>
                             <div>
-                              💰 Price: <strong style={{ color: "#FFD700" }}>₹{g.price_inr}</strong>/kg
+                              💰 Price: <strong style={{ color: "#FFD700" }}>
+                                {g.price_inr !== undefined
+                                  ? `₹${g.price_inr}/kg`
+                                  : g.packs && g.packs.length > 0
+                                    ? g.packs.map(p => `₹${p.price} (${p.size}kg)`).join(", ")
+                                    : "N/A"
+                                }
+                              </strong>
                             </div>
                             <div>📦 MOQ: {g.moq} qtl</div>
                             <div>
@@ -1151,6 +1298,14 @@ export default function ProductsAdmin() {
               onChange={(e) => setForm({ ...form, hsn: e.target.value })}
               style={inputStyle}
             />
+            <select
+              value={form.brand || "SIEA"}
+              onChange={(e) => setForm({ ...form, brand: e.target.value })}
+              style={inputStyle}
+            >
+              <option value="SIEA">SIEA</option>
+              <option value="AANAK">AANAK</option>
+            </select>
 
 
             {renderPricePreview(form.grades)}
@@ -1195,13 +1350,58 @@ export default function ProductsAdmin() {
                         style={gradeInput}
                         placeholder="Origin"
                       />
-                      <input
-                        type="number"
-                        value={g.price_inr}
-                        onChange={(e) => updateGrade(i, "price_inr", Number(e.target.value) || 0)}
-                        style={{ ...gradeInput, background: g.price_inr > 0 ? "#1a2a1a" : "#222" }}
-                        placeholder="Price (₹/kg)"
-                      />
+                      {isPackBased(g) ? (
+                        <div style={{ width: "100%" }}>
+                          {g.packs.map((p, pi) => (
+                            <div key={pi} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+
+                              <input
+                                type="number"
+                                value={p.size}
+                                placeholder="Size (kg)"
+                                onChange={(e) => {
+                                  const updated = [...form.grades];
+                                  updated[i].packs[pi].size = Number(e.target.value);
+                                  updateFormWithGrades(updated);
+                                }}
+                                style={{ ...gradeInput, width: "40%" }}
+                              />
+
+                              <input
+                                type="number"
+                                value={p.price}
+                                placeholder="Price"
+                                onChange={(e) => {
+                                  const updated = [...form.grades];
+                                  updated[i].packs[pi].price = Number(e.target.value);
+                                  updateFormWithGrades(updated);
+                                }}
+                                style={{ ...gradeInput, width: "60%" }}
+                              />
+
+                            </div>
+                          ))}
+
+                          <button
+                            onClick={() => {
+                              const updated = [...form.grades];
+                              updated[i].packs.push({ size: 5, price: 0 });
+                              updateFormWithGrades(updated);
+                            }}
+                            style={addGradeBtn}
+                          >
+                            ➕ Add Pack
+                          </button>
+                        </div>
+                      ) : (
+                        <input
+                          type="number"
+                          value={g.price_inr}
+                          onChange={(e) => updateGrade(i, "price_inr", Number(e.target.value) || 0)}
+                          placeholder="Price (₹/kg)"
+                          style={gradeInput}
+                        />
+                      )}
                       <input
                         type="number"
                         value={g.moq}

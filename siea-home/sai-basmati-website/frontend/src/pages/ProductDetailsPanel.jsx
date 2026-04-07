@@ -25,6 +25,7 @@ const ProductDetailsPanel = ({
     const [gradePricePerKg, setGradePricePerKg] = useState(0);
     const [totalPrice, setTotalPrice] = useState(0);
     const [selectedPacking, setSelectedPacking] = useState('');
+    const [matchedProduct, setMatchedProduct] = useState(null);
 
     if (!product) return null;
 
@@ -47,58 +48,91 @@ const ProductDetailsPanel = ({
 
     // Fetch grades from Firebase
     useEffect(() => {
-        if (!product?.firebaseId) return;
+        if (!product?.brand) return;
 
-        const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
-        const unsubscribe = onValue(gradesRef, (snap) => {
+        const productRef = ref(db, `products/${product.brand}`);
+
+        const unsubscribe = onValue(productRef, (snap) => {
             if (snap.exists()) {
-                const gradesData = snap.val();
-                const gradesArray = Object.keys(gradesData).map(key => ({
-                    id: key,
-                    ...gradesData[key]
-                }));
-                const gradeNames = gradesArray.map(g => g.grade).filter(Boolean);
-                setGrades(gradeNames);
+                const data = snap.val();
+
+                const productsArray = Array.isArray(data)
+                    ? data
+                    : Object.values(data);
+
+                const matched = productsArray.find((p) => {
+                    if (!p) return false;
+
+                    if (p.id && product.id) return p.id === product.id;
+
+                    return (
+                        p.name?.en?.toLowerCase() ===
+                        product.name?.en?.toLowerCase()
+                    );
+                });
+
+                if (matched?.grades) {
+                    setMatchedProduct(matched);
+                    setGrades(matched.grades.map((g) => g.grade));
+                } else {
+                    setGrades([]);
+                }
             } else {
                 setGrades([]);
             }
         });
 
         return () => unsubscribe();
-    }, [product?.firebaseId]);
+    }, [product]);
 
     // When grade changes, fetch its price (which is PER KG in Firebase)
     useEffect(() => {
-        const fetchGradePrice = async () => {
-            if (!selectedGrade || !product?.firebaseId) return;
+        if (!selectedGrade || !product?.brand) return;
 
-            try {
-                const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
-                const snap = await get(gradesRef);
+        const productRef = ref(db, `products/${product.brand}`);
 
-                if (snap.exists()) {
-                    const gradesData = snap.val();
-                    const gradesArray = Object.keys(gradesData).map(key => ({
-                        id: key,
-                        ...gradesData[key]
-                    }));
+        get(productRef).then((snap) => {
+            if (!snap.exists()) return;
 
-                    const selectedGradeObj = gradesArray.find(g =>
-                        g.grade &&
-                        g.grade.toLowerCase() === selectedGrade.toLowerCase()
-                    );
+            const data = snap.val();
+            const productsArray = Array.isArray(data)
+                ? data
+                : Object.values(data);
 
-                    if (selectedGradeObj) {
-                        setGradePricePerKg(selectedGradeObj.price_inr || 0);
-                    }
-                }
-            } catch (error) {
-                console.error("Error fetching grade price:", error);
+            const matched = productsArray.find((p) => {
+                if (!p) return false;
+
+                if (p.id && product.id) return p.id === product.id;
+
+                return (
+                    p.name?.en?.toLowerCase() ===
+                    product.name?.en?.toLowerCase()
+                );
+            });
+
+            const selectedGradeObj = matched?.grades?.find(
+                (g) => g.grade?.toLowerCase() === selectedGrade.toLowerCase()
+            );
+
+            if (!selectedGradeObj) return;
+
+            // ✅ AANAK
+            if (product?.brand === "AANAK" && selectedGradeObj.packs) {
+                const basePack = selectedGradeObj.packs[0];
+                setGradePricePerKg(basePack.price / basePack.size);
             }
-        };
 
-        fetchGradePrice();
-    }, [selectedGrade, product?.firebaseId]);
+            // ✅ SIEA
+            else {
+                setGradePricePerKg(
+                    selectedGradeObj.price_inr_per_kg ||
+                    selectedGradeObj.price_inr ||
+                    0
+                );
+            }
+        });
+
+    }, [selectedGrade, product]);
 
     // Calculate total price when grade price or quantity changes
     useEffect(() => {
@@ -188,7 +222,24 @@ const ProductDetailsPanel = ({
         alert('✅ Product added to cart!');
     };
 
-    const quantityOptions = ['5kg', '10kg', '25kg', '50kg', '100kg', '1ton'];
+    const quantityOptions = useMemo(() => {
+
+        if (product?.brand === "AANAK" && selectedGrade && matchedProduct) {
+            const selected = matchedProduct.grades?.find(
+                g => g.grade?.toLowerCase() === selectedGrade.toLowerCase()
+            );
+
+            if (selected?.packs) {
+                return selected.packs.map(p => `${p.size}kg`);
+            }
+        }
+
+        return ['5kg', '10kg', '25kg', '50kg', '100kg', '1ton'];
+
+    }, [product, selectedGrade, matchedProduct]);
+    useEffect(() => {
+        setQuantity('');
+    }, [selectedGrade]);
 
     // Calculate price per quintal from price per kg
     const pricePerQuintal = gradePricePerKg > 0 ? gradePricePerKg * 100 : 0;

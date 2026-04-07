@@ -39,67 +39,92 @@ export default function Products() {
   // 🔹 Fetch top 4 products
   useEffect(() => {
     const r = ref(db, "products");
+
     const unsub = onValue(r, (snap) => {
       if (snap.exists()) {
         const data = snap.val();
-        const list = Object.keys(data).map((key) => ({
-          ...data[key],
-          firebaseId: key,
-        }));
-        setFeaturedProducts(list.slice(0, 4));
+
+        let all = [];
+
+        Object.keys(data).forEach((brand) => {
+          const brandProducts = data[brand];
+
+          if (Array.isArray(brandProducts)) {
+            const formatted = brandProducts
+              .filter(Boolean) // remove nulls
+              .map((p, index) => ({
+                ...p,
+                brand: p.brand || brand,
+                firebaseId: `${brand}_${index}`,
+              }));
+
+            all = [...all, ...formatted];
+          }
+        });
+
+        // 👉 only first 4
+        setFeaturedProducts(
+          [...all].sort(() => 0.5 - Math.random()).slice(0, 4)
+        );
       } else {
         setFeaturedProducts([]);
       }
     });
+
     return () => unsub();
   }, []);
-
   // 🔹 Price Conversion Logic
   const formatPrice = (product) => {
-    if (!product.price) return "N/A";
+    const symbol = currencySymbols[currency] || "₹";
 
-    // Extract all numbers from string
-    const numbers = product.price.toString().match(/[\d,]+/g);
-    if (!numbers || numbers.length === 0) return "N/A";
+    // ✅ SIEA (has price)
+    if (product.price) {
+      const numbers = product.price.toString().match(/[\d,]+/g);
+      if (!numbers) return "N/A";
 
-    const minINR = Number(numbers[0].replace(/,/g, ""));
-    const maxINR = numbers[1]
-      ? Number(numbers[1].replace(/,/g, ""))
-      : null;
+      const min = Number(numbers[0].replace(/,/g, ""));
+      const max = numbers[1] ? Number(numbers[1].replace(/,/g, "")) : null;
 
-    if (currency === "INR") {
-      if (maxINR) {
-        return `₹${minINR.toLocaleString()} – ₹${maxINR.toLocaleString()} / qtl`;
+      if (currency === "INR") {
+        return max
+          ? `₹${min.toLocaleString()} – ₹${max.toLocaleString()} / qtl`
+          : `₹${min.toLocaleString()} / qtl`;
       }
-      return `₹${minINR.toLocaleString()} / qtl`;
+
+      if (!exchangeRates.INR) return "Loading...";
+
+      const inrPerUsd = exchangeRates.INR;
+      const targetRate = exchangeRates[currency];
+      if (!targetRate) return "N/A";
+
+      const convert = (val) => Math.round((val / inrPerUsd) * targetRate);
+
+      return max
+        ? `${symbol}${convert(min)} – ${symbol}${convert(max)} / qtl`
+        : `${symbol}${convert(min)} / qtl`;
     }
 
-    if (!exchangeRates.INR) return "Loading...";
+    // ✅ AANAK (calculate from grades)
+    if (product.grades) {
+      let prices = [];
 
-    const inrPerUsd = exchangeRates.INR;
-    const targetRate = exchangeRates[currency];
-    if (!targetRate) return "N/A";
+      product.grades.forEach((g) => {
+        g.packs?.forEach((p) => {
+          prices.push(p.price);
+        });
+      });
 
-    // INR → USD
-    const minUSD = minINR / inrPerUsd;
-    const convertedMin = minUSD * targetRate;
+      if (prices.length > 0) {
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
 
-    if (maxINR) {
-      const maxUSD = maxINR / inrPerUsd;
-      const convertedMax = maxUSD * targetRate;
-
-      return `${currencySymbols[currency]}${Math.round(
-        convertedMin
-      ).toLocaleString()} – ${currencySymbols[currency]}${Math.round(
-        convertedMax
-      ).toLocaleString()} / qtl`;
+        return `${symbol}${min} – ${symbol}${max} per pack`;
+      }
     }
 
-    return `${currencySymbols[currency]}${Math.round(
-      convertedMin
-    ).toLocaleString()} / qtl`;
+    return "Price on request";
   };
-  
+
   const fallbackImages = {
     "1121 Basmati": "./img/1121_Golden_Basamati.jpg",
     "1401 Basmati": "./img/1401_Steam_Basamati.jpg",

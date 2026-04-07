@@ -155,7 +155,15 @@ const Cart = () => {
             console.error('Error fetching live prices:', error);
             const fallbackItems = itemsWithoutTotalPrice.map(item => {
               const numberOfBags = item.numberOfBags || 1;
-              let pricePerBag = 0;
+              let pricePerBag = item.totalPrice || item.displayPrice || 0;
+
+              // fallback parse
+              if (!pricePerBag && typeof item.price === 'string') {
+                const priceMatch = item.price.match(/₹\s*([\d,]+\.?\d*)/);
+                if (priceMatch) {
+                  pricePerBag = parseFloat(priceMatch[1].replace(/,/g, '')) || 0;
+                }
+              }
 
               if (typeof item.price === 'string') {
                 const priceMatch = item.price.match(/₹\s*([\d,]+\.?\d*)/);

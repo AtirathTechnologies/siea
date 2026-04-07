@@ -176,7 +176,7 @@ export default function AdminLayout() {
           <div className="tw-mb-4 sm:tw-mb-6 md:tw-mb-8">
             <h2
               className="
-                tw-text-yellow-500 tw-font-bold
+                tw-text-yellow-400 tw-font-bold
                 tw-text-xl sm:tw-text-2xl md:tw-text-3xl lg:tw-text-2xl xl:tw-text-3xl
                 tw-tracking-wide
               "

@@ -81,6 +81,7 @@ const BuyModal = ({
   const [logoPriceINR, setLogoPriceINR] = useState(0);
   const [freightPriceINR, setFreightPriceINR] = useState(0); // shipping cost
   const [totalPriceINR, setTotalPriceINR] = useState(0);
+  const [matchedProduct, setMatchedProduct] = useState(null);
 
   // ---------- Exchange rates – stored as INR per foreign currency ----------
   const [exchangeRates, setExchangeRates] = useState({
@@ -192,29 +193,89 @@ const BuyModal = ({
     }, 0);
   };
 
-
-
-
-  // ---------- Fetch product grades (single product only) ----------
   useEffect(() => {
-    if (isCartOrder || !product?.firebaseId) return;
+    setGrade("");
+    setGrades([]);
+  }, [product]);
 
-    const productRef = ref(db, `products/${product.firebaseId}/grades`);
+
+  useEffect(() => {
+    if (isCartOrder || !product?.brand) return;
+
+    const productRef = ref(db, `products/${product.brand}`);
+
     const unsubscribe = onValue(productRef, (snap) => {
       if (snap.exists()) {
-        const gradesData = snap.val();
-        const gradesArray = Object.keys(gradesData).map((key) => ({
-          id: key,
-          ...gradesData[key],
-        }));
+        let data = snap.val();
 
-        const gradeNames = gradesArray.map((g) => g.grade).filter(Boolean);
-        const selectedGradeObj = gradesArray.find((g) => g.grade === grade);
+        // ✅ Convert to proper array (VERY IMPORTANT)
+        const productsArray = Array.isArray(data)
+          ? data
+          : Object.values(data);
 
-        setGrades(gradeNames);
-        setLiveGradePricePerKg(
-          selectedGradeObj?.price_inr_per_kg || selectedGradeObj?.price_inr || 0
-        );
+        // ✅ Safe find (avoid undefined crash)
+        const matchedProduct = productsArray.find((p) => {
+          if (!p) return false;
+
+          // ✅ SIEA (id exists)
+          if (p.id && product.id) {
+            return p.id === product.id;
+          }
+
+          // ✅ AANAK (match by name)
+          return (
+            p.name?.en?.trim().toLowerCase() ===
+            product.name?.en?.trim().toLowerCase()
+          );
+        });
+        setMatchedProduct(matchedProduct);
+
+
+        if (matchedProduct?.grades) {
+          const gradesArray = matchedProduct.grades;
+
+          const gradeNames = gradesArray.map((g) => g.grade);
+
+          const selectedGradeObj = gradesArray.find(
+            (g) => g.grade === grade
+          );
+
+          setGrades(gradeNames);
+
+          let price = 0;
+
+          if (selectedGradeObj) {
+            // ✅ SIEA case
+            if (selectedGradeObj.price_inr || selectedGradeObj.price_inr_per_kg) {
+              price =
+                selectedGradeObj.price_inr_per_kg ||
+                selectedGradeObj.price_inr;
+            }
+
+            // ✅ AANAK case (packs based pricing)
+            else if (selectedGradeObj.packs?.length > 0) {
+              // Find selected pack based on quantity
+              let qtyInKg = 0;
+
+              if (quantity === "1ton") {
+                qtyInKg = 1000;
+              } else if (quantity?.includes("kg")) {
+                qtyInKg = parseFloat(quantity.replace("kg", ""));
+              }
+
+              const selectedPack = selectedGradeObj.packs.find(
+                (p) => p.size === qtyInKg
+              );
+
+              price = selectedPack ? selectedPack.price : 0;
+            }
+          }
+
+          setLiveGradePricePerKg(price || 0);
+        } else {
+          setGrades([]);
+          setLiveGradePricePerKg(0);
+        }
       } else {
         setGrades([]);
         setLiveGradePricePerKg(0);
@@ -222,8 +283,7 @@ const BuyModal = ({
     });
 
     return () => unsubscribe();
-  }, [product?.firebaseId, grade, isCartOrder]);
-
+  }, [product, grade, isCartOrder]);
   // ---------- Pre‑fill from user profile ----------
   useEffect(() => {
     if (!isOpen || !profile?.uid) return;
@@ -261,6 +321,23 @@ const BuyModal = ({
 
     return () => unsubscribe();
   }, [isOpen, profile?.uid]);
+
+  const getDynamicQuantities = () => {
+    if (!matchedProduct || !grade) return [];
+
+    const selectedGradeObj = matchedProduct.grades?.find(
+      (g) => g.grade === grade
+    );
+
+    // ✅ AANAK case (packs)
+    if (selectedGradeObj?.packs) {
+      return selectedGradeObj.packs.map(p => p.size);
+    }
+
+    // ✅ SIEA fallback
+    return getAvailableQuantities(packing, ALL_QUANTITIES);
+  };
+
 
   // ---------- Fetch exchange rates from Firebase (USD‑base format) ----------
   useEffect(() => {
@@ -370,8 +447,8 @@ const BuyModal = ({
       let totalINR = 0;
 
       if (isDomestic) {
-        const ratePerBag = DOMESTIC_FREIGHT_RATES_PER_BAG[transportMode];
-        fPriceINR = ratePerBag ? ratePerBag * totalBags : 0;
+        const rate = DOMESTIC_FREIGHT_RATES_PER_BAG[transportMode];
+        fPriceINR = rate || 0;
 
         totalINR = cartTotalINR + pPriceINR + fPriceINR;
 
@@ -391,46 +468,76 @@ const BuyModal = ({
     } else {
 
       // ---------- SINGLE PRODUCT ----------
-      const basePricePerQtlINR = liveGradePricePerKg * 100;
 
       let qtyInKg =
         quantity === "1ton"
           ? 1000
           : parseFloat(quantity.replace("kg", "")) || 0;
 
-      const qtyInQuintals = qtyInKg / 100;
-      const qPriceINR = basePricePerQtlINR * qtyInQuintals * numberOfBags;
+      let qPriceINR = 0;
+      let pPriceINR = 0;
+      let gradePrice = 0;
 
-      const pPriceINR = calculatePackingPrice(
-        packing,
-        qtyInKg,
-        numberOfBags
-      );
+      // ✅ AANAK (Pack-based pricing)
+      if (matchedProduct?.brand === "AANAK") {
 
+        const selectedGradeObj = matchedProduct?.grades?.find(
+          (g) => g.grade === grade
+        );
 
-      const lPriceINR = 0;
+        const selectedPack = selectedGradeObj?.packs?.find(
+          (p) => p.size === qtyInKg
+        );
 
+        const packPrice = selectedPack ? selectedPack.price : 0;
 
-      const totalWeightInTons = (qtyInKg * numberOfBags) / 1000;
+        // 👉 Direct price × bags
+        qPriceINR = packPrice * numberOfBags;
+
+        // 👉 Packing already included
+        pPriceINR = 0;
+
+        // 👉 For display only
+        gradePrice = packPrice;
+      }
+
+      // ✅ SIEA (Per kg / quintal pricing)
+      else {
+
+        const basePricePerQtlINR = liveGradePricePerKg * 100;
+
+        const qtyInQuintals = qtyInKg / 100;
+
+        qPriceINR = basePricePerQtlINR * qtyInQuintals * numberOfBags;
+
+        pPriceINR = calculatePackingPrice(
+          packing,
+          qtyInKg,
+          numberOfBags
+        );
+
+        gradePrice = basePricePerQtlINR;
+      }
 
       let fPriceINR = 0;
       let totalINR = 0;
 
       if (isDomestic) {
 
-        const ratePerBag = DOMESTIC_FREIGHT_RATES_PER_BAG[transportMode];
-        fPriceINR = ratePerBag ? ratePerBag * numberOfBags : 0;
+        const rate = DOMESTIC_FREIGHT_RATES_PER_BAG[transportMode];
+        fPriceINR = rate || 0;
 
         totalINR = qPriceINR + pPriceINR + fPriceINR;
 
       } else {
 
-        // ✅ ALWAYS FOB ONLY (ignore CIF completely)
+        // ✅ FOB only
         totalINR = qPriceINR + pPriceINR;
         fPriceINR = 0;
       }
 
-      setGradePriceINR(basePricePerQtlINR);
+      // ---------- SET STATES ----------
+      setGradePriceINR(gradePrice);
       setPackingPriceINR(pPriceINR);
       setQuantityPriceINR(qPriceINR);
       setFreightPriceINR(fPriceINR);
@@ -572,6 +679,10 @@ const BuyModal = ({
   useEffect(() => {
     setQuantity("");
   }, [packing]);
+
+  useEffect(() => {
+    setQuantity("");
+  }, [grade]);
 
   // ---------- Submit handler ----------
   const handleSubmit = async () => {
@@ -930,7 +1041,7 @@ const BuyModal = ({
                       >
                         <option value="">{t("select_quantity")}</option>
 
-                        {getAvailableQuantities(packing, ALL_QUANTITIES).map((q) => (
+                        {getDynamicQuantities().map((q) => (
                           <option key={q} value={q === 1000 ? "1ton" : `${q}kg`}>
                             {q === 1000 ? "1ton" : `${q}kg`}
                           </option>
@@ -1040,7 +1151,11 @@ const BuyModal = ({
                 {!isCartOrder && (
                   <div className="bill-item">
                     <span>{t("grade_price")}:</span>
-                    <span>{currencySymbol}{displayGradePrice.toFixed(2)} {t("per")} {t("quintal")}</span>
+                    <span>
+                      {currencySymbol}{displayGradePrice.toFixed(2)}{" "}
+                      {t("per")}{" "}
+                      {matchedProduct?.brand === "AANAK" ? "pack" : t("quintal")}
+                    </span>
                   </div>
                 )}
 

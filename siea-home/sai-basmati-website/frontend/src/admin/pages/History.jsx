@@ -109,88 +109,90 @@ export default function History() {
 
   // Extract product data from history entry
   const extractProductData = (data) => {
-    if (!data || typeof data !== 'object') {
-      return [];
-    }
+    if (!data || typeof data !== 'object') return [];
 
     try {
-      // Check if this is a product object (has category, grades, etc.)
-      if (data.category || data.grades || data.name) {
-        const product = {
-          id: String(data.id || data.key || Math.random().toString(36).substr(2, 9)),
+
+      // ✅ 1. PRODUCT FIRST (MOST IMPORTANT)
+      if (data.category || data.grades) {
+        return [{
+          type: "product",
+          id: data.id || data.firebaseKey,
           name: getProductName(data.name),
           description: getProductDescription(data.desc),
-          category: String(data.category || ""),
-          price: String(data.price || "Price not set"),
-          image: data.image || "",
-          packs: Array.isArray(data.packs) ? data.packs : [],
-          updatedAt: data.updatedAt ? new Date(data.updatedAt).toLocaleString() : "",
-          updatedBy: data.updatedBy || "",
-          hsn: data.hsn || "",
-          specs: data.specs || {}
-        };
+          category: data.category,
 
-        // Extract grades
-        let grades = [];
-        if (data.grades && Array.isArray(data.grades)) {
-          grades = data.grades.map(grade => {
-            if (typeof grade === 'string') {
-              return { name: grade, price_inr: 0, harvest: "", origin: "", stock: "" };
-            }
-            if (typeof grade === 'object') {
-              return {
-                name: String(grade.grade || grade.name || "Unknown Grade"),
-                price_inr: Number(grade.price_inr || grade.price || 0),
-                harvest: String(grade.harvest || ""),
-                origin: String(grade.origin || ""),
-                stock: String(grade.stock || ""),
-                moq: Number(grade.moq || 0)
-              };
-            }
-            return null;
-          }).filter(Boolean);
-        }
+          grades: (data.grades || []).map(g => ({
+            name: g.grade,
 
-        product.grades = grades;
-        return [product];
+            // ✅ FIX HERE
+            price_inr: g.price_inr || (
+              g.packs && g.packs.length > 0
+                ? Math.min(...g.packs.map(p => p.price)) // lowest price
+                : 0
+            ),
+
+            packs: g.packs || [],   // 👈 IMPORTANT ADD
+            harvest: g.harvest,
+            origin: g.origin,
+            stock: g.stock,
+            moq: g.moq
+          })),
+
+          price: data.price,
+          specs: data.specs,
+          hsn: data.hsn,
+          updatedAt: data.updatedAt,
+          updatedBy: data.updatedBy
+        }];
       }
 
-      // Check if this is an order object (has items array)
+      // ✅ 2. ORDER
       if (data.items && Array.isArray(data.items)) {
-        // This is a sample courier order
-        const order = {
-          id: data.quoteId || data.id || "order",
-          name: `Order: ${data.name || "Unknown Customer"}`,
-          description: `Company: ${data.company || "N/A"}, Status: ${data.status || "Pending"}`,
+        return [{
           type: "order",
-          items: data.items || [],
-          totalAmount: data.totalAmount || 0,
-          shippingCharge: data.shippingCharge || 0,
-          riceTotal: data.riceTotal || 0,
-          paymentMethod: data.paymentMethod || "",
-          paymentStatus: data.paymentStatus || ""
-        };
-        return [order];
+          id: data.quoteId || data.id,
+          name: data.name,
+          items: data.items,
+          totalAmount: data.totalAmount,
+          paymentMethod: data.paymentMethod,
+          paymentStatus: data.paymentStatus,
+          riceTotal: data.riceTotal,
+          shippingCharge: data.shippingCharge
+        }];
       }
 
-      // Check if this is a bulk quote
+      // ✅ 3. BULK QUOTE (STRICT CHECK)
       if (data.type === "bulk" || data.quoteId?.startsWith("BulkQuote")) {
-        const quote = {
-          id: data.quoteId || "bulk-quote",
-          name: `Bulk Quote: ${data.name || "Unknown Customer"}`,
-          description: `Product: ${data.product || "N/A"}, Grade: ${data.grade || "N/A"}`,
+        return [{
           type: "bulk_quote",
-          product: data.product || "",
-          grade: data.grade || "",
-          quantity: data.quantity || "",
-          totalPrice: data.totalPrice || 0,
-          currency: data.currency || "INR",
-          status: data.status || "Pending"
-        };
-        return [quote];
+          id: data.quoteId,
+          name: data.name,
+          product: data.product,
+          grade: data.grade,
+          quantity: data.quantity,
+
+          gradePrice: data.gradePrice,
+          packingPrice: data.packingPrice,
+          freightPrice: data.freightPrice,
+          totalPrice: data.totalPrice,
+
+          originPort: data.originPort,
+          transportMode: data.transportMode,
+
+          city: data.city,
+          addressState: data.addressState,
+          addressCountry: data.addressCountry,
+
+          email: data.email,
+          phone: data.phone,
+
+          status: data.status,
+        }];
       }
 
       return [];
+
     } catch (error) {
       console.error("Error extracting data:", error);
       return [];
@@ -227,7 +229,12 @@ export default function History() {
             <div className="tw-flex tw-justify-between tw-items-center tw-mb-1">
               <span className="tw-text-yellow-200 tw-font-semibold">{grade.name}</span>
               <span className="tw-text-green-400 tw-font-bold">
-                ₹{grade.price_inr || 0}/kg
+                {grade.packs && grade.packs.length > 0
+                  ? grade.packs.map(p => `₹${p.price} (${p.size}kg)`).join(", ")
+                  : grade.price_inr
+                    ? `₹${grade.price_inr}/kg`
+                    : "Pack Pricing"
+                }
               </span>
             </div>
             <div className="tw-grid tw-grid-cols-2 tw-gap-1 tw-text-xs">
@@ -335,37 +342,75 @@ export default function History() {
     // Render bulk quote card
     if (item.type === "bulk_quote") {
       return (
-        <div className="tw-bg-gray-900/60 tw-border tw-border-purple-700 tw-rounded-xl tw-p-4 tw-h-full">
-          <div className="tw-flex tw-justify-between tw-items-start tw-mb-3">
-            <div>
-              <h4 className="tw-text-xl tw-font-bold tw-text-purple-300 tw-mb-1">
-                {item.name}
-              </h4>
-              <span className="tw-bg-purple-900/50 tw-text-purple-300 tw-px-2 tw-py-1 tw-rounded tw-text-xs">
-                Bulk Quote
-              </span>
-            </div>
-            <span className="tw-text-green-400 tw-font-bold">
-              {item.currency === "USD" ? "$" : "₹"}{item.totalPrice || 0}
+        <div className="tw-bg-gray-900/60 tw-border tw-border-purple-700 tw-rounded-xl tw-p-4 tw-space-y-2">
+
+          <h4 className="tw-text-purple-300 tw-font-bold tw-text-lg">
+            {item.name}
+          </h4>
+
+          <p className="tw-text-gray-300">
+            📦 Product: <span className="tw-text-white">{item.product}</span>
+          </p>
+
+          <p className="tw-text-gray-300">
+            🏷 Grade: <span className="tw-text-white">{item.grade}</span>
+          </p>
+
+          <p className="tw-text-gray-300">
+            ⚖ Quantity: <span className="tw-text-white">{item.quantity}</span>
+          </p>
+
+          {/* 💰 Pricing Breakdown */}
+          <div className="tw-bg-black/30 tw-p-3 tw-rounded-lg tw-mt-2">
+            <p className="tw-text-yellow-400 tw-font-semibold">💰 Price Details</p>
+
+            <p className="tw-text-gray-300 text-sm">
+              Grade Price: ${item.gradePrice?.toFixed(2)}
+            </p>
+
+            <p className="tw-text-gray-300 text-sm">
+              Packing: ${item.packingPrice?.toFixed(2)}
+            </p>
+
+            <p className="tw-text-gray-300 text-sm">
+              Freight: ${item.freightPrice?.toFixed(2)}
+            </p>
+
+            <p className="tw-text-green-400 tw-font-bold tw-mt-1">
+              Total: ${item.totalPrice?.toFixed(2)}
+            </p>
+          </div>
+
+          {/* 🚚 Logistics */}
+          <div className="tw-text-gray-400 tw-text-sm">
+            🚢 Port: {item.originPort}
+          </div>
+
+          <div className="tw-text-gray-400 tw-text-sm">
+            🚛 Transport: {item.transportMode}
+          </div>
+
+          {/* 📍 Address */}
+          <div className="tw-text-gray-400 tw-text-xs tw-mt-2">
+            📍 {item.city}, {item.addressState}, {item.addressCountry}
+          </div>
+
+          {/* 📞 Contact */}
+          <div className="tw-text-gray-500 tw-text-xs">
+            📧 {item.email} | 📱 {item.phone}
+          </div>
+
+          {/* Status */}
+          <div className="tw-flex tw-justify-between tw-items-center tw-mt-2">
+            <span className="tw-text-xs tw-bg-yellow-500/20 tw-text-yellow-300 tw-px-2 tw-py-1 tw-rounded">
+              {item.status}
+            </span>
+
+            <span className="tw-text-xs tw-text-gray-500">
+              ID: {item.id}
             </span>
           </div>
 
-          <div className="tw-space-y-2 tw-mb-4">
-            <p className="tw-text-gray-300">
-              <span className="tw-text-purple-300">Product:</span> {item.product}
-            </p>
-            <p className="tw-text-gray-300">
-              <span className="tw-text-purple-300">Grade:</span> {item.grade}
-            </p>
-            <p className="tw-text-gray-300">
-              <span className="tw-text-purple-300">Quantity:</span> {item.quantity}
-            </p>
-          </div>
-
-          <div className="tw-flex tw-justify-between tw-items-center tw-text-xs tw-text-gray-400">
-            <span>Status: {item.status}</span>
-            <span>ID: {item.id.substring(0, 8)}...</span>
-          </div>
         </div>
       );
     }

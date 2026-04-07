@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext.jsx';
-import Logo from '../assets/logo.svg';
+import logoUrl from "../assets/SIEA.svg";
+import logoUrl1 from "../assets/AANAK_Logo.svg";
 
 const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profile, handleLogout }) => {
   const { t } = useLanguage();
@@ -125,9 +126,9 @@ const NavbarProd = ({ searchProducts, showProductsPage, showProfilePanel, profil
 
   return (
     <nav className="navbar">
-      <div className="navbar-logo-title" onClick={handleGoHome}>
-        <img src={Logo} alt="Logo" className="navbar-logo" />
-        <h1 className="navbar-title">SIEA</h1>
+      <div className="navbar-logo-title tw-flex tw-items-center tw-gap-2" onClick={handleGoHome}>
+        <img src={logoUrl} alt="SIEA" className="navbar-logo tw-w-12 tw-h-auto" />
+        <img src={logoUrl1} alt="AANAK" className="navbar-logo tw-w-12 tw-h-auto" />
       </div>
 
       <div className="navbar-right">

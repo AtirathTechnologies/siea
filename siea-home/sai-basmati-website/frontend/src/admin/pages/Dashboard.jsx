@@ -30,29 +30,40 @@ export default function Dashboard() {
   const [pieData, setPieData] = useState([]);
   const [statusData, setStatusData] = useState([]);
 
-  
+
   const [newOrderFlash, setNewOrderFlash] = useState(false);
   const prevTotalOrdersRef = useRef(0);
   const audioRef = useRef(null);
   const quotesListenerRef = useRef(null);
 
   useEffect(() => {
-    
+
     audioRef.current = typeof Audio !== "undefined" ? new Audio(ALERT_BEEP_BASE64) : null;
   }, []);
 
   useEffect(() => {
     const unsubs = [];
 
-    
+
     unsubs.push(onValue(ref(db, "users"), (snap) => {
       const count = snap.exists() ? Object.keys(snap.val() || {}).length : 0;
       setStats(prev => ({ ...prev, totalUsers: count }));
     }));
 
     unsubs.push(onValue(ref(db, "products"), (snap) => {
-      const count = snap.exists() ? Object.keys(snap.val() || {}).length : 0;
-      setStats(prev => ({ ...prev, totalProducts: count }));
+      let total = 0;
+
+      if (snap.exists()) {
+        const data = snap.val();
+
+        Object.values(data).forEach((brandProducts) => {
+          if (typeof brandProducts === "object") {
+            total += Object.keys(brandProducts).length;
+          }
+        });
+      }
+
+      setStats(prev => ({ ...prev, totalProducts: total }));
     }));
 
     unsubs.push(onValue(ref(db, "services"), (snap) => {
@@ -65,7 +76,7 @@ export default function Dashboard() {
       setStats(prev => ({ ...prev, totalServices: total }));
     }));
 
-    
+
     const quotesRef = query(ref(db, "quotes"), limitToLast(300));
     quotesListenerRef.current = (snap) => {
       const raw = snap.val() || {};
@@ -75,12 +86,12 @@ export default function Dashboard() {
 
 
       Object.entries(raw).forEach(([k, v]) => {
-        
+
         if (v && typeof v === "object" && !Array.isArray(v)) {
           const maybeBucketValues = Object.values(v);
           const isBucket = maybeBucketValues.length > 0 && maybeBucketValues.every(x => typeof x === "object" && ("timestamp" in x || Object.keys(x).length > 0));
           if (isBucket) {
-            
+
             Object.entries(v).forEach(([id, order]) => {
               flat.push({
                 id,
@@ -92,7 +103,7 @@ export default function Dashboard() {
             return;
           }
         }
-        
+
         if (v && typeof v === "object") {
           flat.push({
             id: k,
@@ -103,7 +114,7 @@ export default function Dashboard() {
         }
       });
 
-      
+
       const byId = {};
       flat.forEach(o => {
         if (!o.id) return;
@@ -111,16 +122,16 @@ export default function Dashboard() {
       });
       flat = Object.values(byId);
 
-      
+
       flat.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-      
+
       const total = flat.length;
       const pending = flat.filter(o => !o.status || o.status === "Pending").length;
       const todayStart = new Date().setHours(0, 0, 0, 0);
       const todayCount = flat.filter(o => (o.timestamp || 0) >= todayStart).length;
 
-      
+
       const recent = flat.slice(0, 6).map(o => ({
         id: o.id,
         action: (o.type === "sample_courier" || (o.type && o.type.includes("sample"))) ? "Sample Courier Request" : "Bulk Quote Request",
@@ -129,22 +140,22 @@ export default function Dashboard() {
         status: o.status || "Pending",
       }));
 
-      
+
       setOrders7Days(calc7DayCounts(flat));
       setPieData(calcTypePie(flat));
       setStatusData(calcStatusCounts(flat));
 
-      
+
       const prevTotal = prevTotalOrdersRef.current || 0;
       if (total > prevTotal) {
-        
+
         try { audioRef.current?.play?.(); } catch (e) { /* ignore autoplay errors */ }
         setNewOrderFlash(true);
         setTimeout(() => setNewOrderFlash(false), 2500);
       }
       prevTotalOrdersRef.current = total;
 
-      
+
       setStats(prev => ({ ...prev, totalOrders: total, pendingQuotes: pending, todayOrders: todayCount }));
       setRecentActivity(recent);
       setLoading(false);
@@ -152,31 +163,31 @@ export default function Dashboard() {
 
     onValue(quotesRef, quotesListenerRef.current);
 
-    
+
     return () => {
       unsubs.forEach(fn => fn());
       if (quotesRef && quotesListenerRef.current) off(quotesRef, "value", quotesListenerRef.current);
     };
   }, []);
 
-  
+
   const inferTypeFromBucketKey = (bucketKey, order) => {
     if (!bucketKey) return order?.type || "bulk";
     if (bucketKey.toLowerCase().includes("sample")) return "sample_courier";
     if (bucketKey.toLowerCase().includes("bulk")) return "bulk";
-    
+
     return order?.type || "bulk";
   };
 
   const inferTypeFromOrder = (order) => {
     if (!order) return "bulk";
     if ((order.type || "").toLowerCase().includes("sample")) return "sample_courier";
-    if (order.items || order.items?.length) return "sample_courier"; 
+    if (order.items || order.items?.length) return "sample_courier";
     return "bulk";
   };
 
   const getNameFromOrder = (o) => {
-    
+
     return o?.name || o?.fullName || o?.full_name || o?.displayName || o?.customerName || o?.company || o?.email || "No Name";
   };
 
@@ -237,7 +248,7 @@ export default function Dashboard() {
     return date.toLocaleDateString();
   };
 
-  
+
   const handleCardClick = (cardType) => {
     switch (cardType) {
       case "users":
@@ -263,7 +274,7 @@ export default function Dashboard() {
     }
   };
 
-  
+
   const statCards = [
     {
       label: ["Total", "Users"],
@@ -317,12 +328,12 @@ export default function Dashboard() {
     },
   ];
 
-  
+
   const PIE_COLORS = ["#F59E0B", "#06B6D4"]; // yellow, cyan
 
   return (
     <div className="tw-space-y-6 sm:tw-space-y-8 md:tw-space-y-10 tw-p-2 sm:tw-p-4">
-      
+
       <div className="tw-text-center tw-px-2">
         <h1 className="
           tw-font-bold
@@ -337,7 +348,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      
+
       <div className="
         tw-grid
         tw-grid-cols-1
@@ -407,9 +418,9 @@ export default function Dashboard() {
         ))}
       </div>
 
-      
+
       <div className="tw-grid tw-grid-cols-1 lg:tw-grid-cols-3 tw-gap-4">
-        
+
         <div className="tw-bg-gray-900/50 tw-rounded-xl tw-p-4 tw-border tw-border-yellow-600/10">
           <h3 className="tw-text-yellow-400 tw-font-semibold tw-mb-3">Orders - Last 7 Days</h3>
           <div style={{ height: 200 }}>
@@ -425,7 +436,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        
+
         <div className="tw-bg-gray-900/50 tw-rounded-xl tw-p-4 tw-border tw-border-yellow-600/10">
           <h3 className="tw-text-yellow-400 tw-font-semibold tw-mb-3">Bulk vs Sample</h3>
           <div style={{ height: 200 }}>
@@ -441,7 +452,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        
+
         <div className="tw-bg-gray-900/50 tw-rounded-xl tw-p-4 tw-border tw-border-yellow-600/10">
           <h3 className="tw-text-yellow-400 tw-font-semibold tw-mb-3">Status Distribution</h3>
           <div style={{ height: 200 }}>
@@ -458,7 +469,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      
+
       <div className="tw-bg-gray-900/50 tw-backdrop-blur-sm tw-rounded-lg tw-p-4 tw-border tw-border-yellow-600/20">
         <h2 className="tw-text-xl tw-font-bold tw-text-yellow-400 tw-mb-4">Recent Activity</h2>
 

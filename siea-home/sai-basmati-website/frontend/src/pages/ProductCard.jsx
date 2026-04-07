@@ -69,29 +69,18 @@ const ProductCard = ({
     });
   }, [quantity]);
 
-  
+
   // Fetch grades from Firebase
   // Fetch grades (one time, no listener)
   useEffect(() => {
-    const fetchGrades = async () => {
-      if (!product?.firebaseId) return;
+    if (product?.grades) {
+      const gradeNames = product.grades.map(g => g.grade);
+      setGrades(gradeNames);
+    } else {
+      setGrades([]);
+    }
+  }, [product]);
 
-      const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
-      const snap = await get(gradesRef);
-
-      if (snap.exists()) {
-        const gradesData = snap.val();
-        const gradeNames = Object.values(gradesData)
-          .map(g => g.grade)
-          .filter(Boolean);
-        setGrades(gradeNames);
-      } else {
-        setGrades([]);
-      }
-    };
-
-    fetchGrades();
-  }, [product?.firebaseId]);
 
   // Reset packing if invalid
   useEffect(() => {
@@ -101,28 +90,32 @@ const ProductCard = ({
   }, [quantity]);
 
   // Fetch selected grade price
+
   useEffect(() => {
-    const fetchGradePrice = async () => {
-      if (!selectedGrade || !product?.firebaseId) return;
+    if (!selectedGrade || !product?.grades) return;
 
-      const gradesRef = ref(db, `products/${product.firebaseId}/grades`);
-      const snap = await get(gradesRef);
+    const selected = product.grades.find(
+      g => g.grade.toLowerCase() === selectedGrade.toLowerCase()
+    );
 
-      if (snap.exists()) {
-        const gradesData = snap.val();
-
-        const selectedGradeObj = Object.values(gradesData).find(g =>
-          g.grade?.toLowerCase() === selectedGrade.toLowerCase()
-        );
-
-        if (selectedGradeObj) {
-          setGradePricePerKg(selectedGradeObj.price_inr || 0);
-        }
+    if (selected) {
+      // ✅ AANAK
+      if (selected.packs?.length > 0) {
+        const basePack = selected.packs[0];
+        const pricePerKg = basePack.price / basePack.size;
+        setGradePricePerKg(pricePerKg);
       }
-    };
+      // ✅ SIEA
+      else {
+        const pricePerKg =
+          selected.price_inr_per_kg ||
+          selected.price_inr ||
+          0;
 
-    fetchGradePrice();
-  }, [selectedGrade, product?.firebaseId]);
+        setGradePricePerKg(pricePerKg);
+      }
+    }
+  }, [selectedGrade, product]);
 
   // Calculate total price
   useEffect(() => {
@@ -140,26 +133,39 @@ const ProductCard = ({
   }, [gradePricePerKg, quantity]);
 
   const formatPriceWithCurrency = () => {
-    if (!product.price || typeof product.price !== 'string') {
-      return 'Price on request';
-    }
-
-    const numbers = product.price.match(/[\d,]+/g);
-    if (!numbers || numbers.length < 2) return product.price;
-
-    const [minStr, maxStr] = numbers;
-    const minINR = parseInt(minStr.replace(/,/g, ''), 10);
-    const maxINR = parseInt(maxStr.replace(/,/g, ''), 10);
-
-    if (isNaN(minINR) || isNaN(maxINR)) return product.price;
-
-    const rate = getConversionRate ? getConversionRate() : 1;
     const symbol = getCurrencySymbol ? getCurrencySymbol() : "₹";
 
-    const minConverted = Math.round(minINR * rate);
-    const maxConverted = Math.round(maxINR * rate);
+    // ✅ SIEA case (already has price)
+    if (product.price && typeof product.price === "string") {
+      const numbers = product.price.match(/[\d,]+/g);
+      if (!numbers || numbers.length < 2) return product.price;
 
-    return `${symbol}${minConverted.toLocaleString()} – ${symbol}${maxConverted.toLocaleString()} / qtl`;
+      const [minStr, maxStr] = numbers;
+      const min = parseInt(minStr.replace(/,/g, ""), 10);
+      const max = parseInt(maxStr.replace(/,/g, ""), 10);
+
+      return `${symbol}${min.toLocaleString()} – ${symbol}${max.toLocaleString()} / qtl`;
+    }
+
+    // ✅ AANAK case (calculate from grades)
+    if (product.grades) {
+      let prices = [];
+
+      product.grades.forEach((g) => {
+        g.packs?.forEach((p) => {
+          prices.push(p.price);
+        });
+      });
+
+      if (prices.length > 0) {
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+
+        return `${symbol}${min} – ${symbol}${max} per pack`;
+      }
+    }
+
+    return "Price on request";
   };
 
   const displayPrice = formatPriceWithCurrency();
@@ -232,7 +238,27 @@ const ProductCard = ({
     alert('✅ Product added to cart!');
   };
 
-  const quantityOptions = ['5kg', '10kg', '25kg', '50kg', '100kg', '1ton'];
+  const quantityOptions = useMemo(() => {
+
+    // ✅ AANAK → get sizes from Firebase packs
+    if (product?.brand === "AANAK" && selectedGrade) {
+      const selected = product.grades?.find(
+        g => g.grade.toLowerCase() === selectedGrade.toLowerCase()
+      );
+
+      if (selected?.packs) {
+        return selected.packs.map(p => `${p.size}kg`);
+      }
+    }
+
+    // ✅ Default (SIEA)
+    return ['5kg', '10kg', '25kg', '50kg', '100kg', '1ton'];
+
+  }, [product, selectedGrade]);
+
+  useEffect(() => {
+    setQuantity('');
+  }, [selectedGrade]);
 
   // Calculate price per quintal from price per kg
   const pricePerQuintal = gradePricePerKg > 0 ? gradePricePerKg * 100 : 0;
@@ -337,17 +363,12 @@ const ProductCard = ({
                     className="tw-w-full tw-bg-gray-800/50 tw-border tw-border-yellow-400/30 tw-rounded-lg tw-p-3 tw-text-white focus:tw-outline-none focus:tw-border-yellow-500"
                   >
                     <option value="">Choose Grade</option>
-                    {grades.length > 0 ? (
-                      grades.map((grade, index) => (
-                        <option key={index} value={grade}>{grade}</option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="Premium">Premium</option>
-                        <option value="Standard">Standard</option>
-                        <option value="Economy">Economy</option>
-                      </>
-                    )}
+
+                    {grades.map((grade, index) => (
+                      <option key={index} value={grade}>
+                        {grade}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

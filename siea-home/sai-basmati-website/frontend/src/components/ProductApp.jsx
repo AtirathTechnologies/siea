@@ -156,20 +156,37 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
   // Fetch products + preserve Firebase key as firebaseId
   useEffect(() => {
     const r = ref(db, "products");
-    const unsubscribe = onValue(r, snap => {
+
+    const unsubscribe = onValue(r, (snap) => {
       if (snap.exists()) {
         const data = snap.val();
-        const list = Object.keys(data).map(key => ({
-          ...data[key],
-          firebaseId: key
-        }));
-        setAllProducts(list);
-        setFilteredProducts(list);
+
+        let all = [];
+
+        Object.keys(data).forEach((brand) => {
+          const brandProducts = data[brand];
+
+          if (Array.isArray(brandProducts)) {
+            const formatted = brandProducts
+              .filter(Boolean)
+              .map((p, index) => ({
+                ...p,
+                brand: p.brand || brand,
+                firebaseId: `${brand}_${index}`
+              }));
+
+            all = [...all, ...formatted];
+          }
+        });
+
+        setAllProducts(all);
+        setFilteredProducts(all);
       } else {
         setAllProducts([]);
         setFilteredProducts([]);
       }
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -205,20 +222,20 @@ const AppContent = ({ profile, showWarning, searchQuery }) => {
         if (filteredCategory === "Basmati Rice") {
           return (
             p.category === "Basmati Rice" &&
-            (!p.brand || p.brand !== "AANAK")
+            p.brand !== "AANAK"
           );
         }
 
-        // ✅ Non-Basmati
         if (filteredCategory === "Non Basmati Rice") {
-          return p.category === "Non Basmati Rice";
+          return (
+            p.category === "Non Basmati Rice" &&
+            p.brand !== "AANAK"
+          );
         }
 
-        // ✅ AANAK only
         if (filteredCategory === "AANAK") {
           return p.brand === "AANAK";
         }
-
         return true;
       });
     }
