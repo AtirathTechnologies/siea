@@ -77,35 +77,8 @@ export default function Products() {
   const formatPrice = (product) => {
     const symbol = currencySymbols[currency] || "₹";
 
-    // ✅ SIEA (has price)
-    if (product.price) {
-      const numbers = product.price.toString().match(/[\d,]+/g);
-      if (!numbers) return "N/A";
-
-      const min = Number(numbers[0].replace(/,/g, ""));
-      const max = numbers[1] ? Number(numbers[1].replace(/,/g, "")) : null;
-
-      if (currency === "INR") {
-        return max
-          ? `₹${min.toLocaleString()} – ₹${max.toLocaleString()} / qtl`
-          : `₹${min.toLocaleString()} / qtl`;
-      }
-
-      if (!exchangeRates.INR) return "Loading...";
-
-      const inrPerUsd = exchangeRates.INR;
-      const targetRate = exchangeRates[currency];
-      if (!targetRate) return "N/A";
-
-      const convert = (val) => Math.round((val / inrPerUsd) * targetRate);
-
-      return max
-        ? `${symbol}${convert(min)} – ${symbol}${convert(max)} / qtl`
-        : `${symbol}${convert(min)} / qtl`;
-    }
-
-    // ✅ AANAK (calculate from grades)
-    if (product.grades) {
+    // ✅ PRIORITY: AANAK first
+    if (product.brand === "AANAK" && product.grades) {
       let prices = [];
 
       product.grades.forEach((g) => {
@@ -120,6 +93,19 @@ export default function Products() {
 
         return `${symbol}${min} – ${symbol}${max} per pack`;
       }
+    }
+
+    // ✅ THEN SIEA
+    if (product.price) {
+      const numbers = product.price.toString().match(/[\d,]+/g);
+      if (!numbers) return "N/A";
+
+      const min = Number(numbers[0].replace(/,/g, ""));
+      const max = numbers[1] ? Number(numbers[1].replace(/,/g, "")) : null;
+
+      return max
+        ? `${symbol}${min.toLocaleString()} – ${symbol}${max.toLocaleString()} / qtl`
+        : `${symbol}${min.toLocaleString()} / qtl`;
     }
 
     return "Price on request";

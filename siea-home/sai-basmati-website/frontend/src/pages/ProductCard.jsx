@@ -135,20 +135,8 @@ const ProductCard = ({
   const formatPriceWithCurrency = () => {
     const symbol = getCurrencySymbol ? getCurrencySymbol() : "₹";
 
-    // ✅ SIEA case (already has price)
-    if (product.price && typeof product.price === "string") {
-      const numbers = product.price.match(/[\d,]+/g);
-      if (!numbers || numbers.length < 2) return product.price;
-
-      const [minStr, maxStr] = numbers;
-      const min = parseInt(minStr.replace(/,/g, ""), 10);
-      const max = parseInt(maxStr.replace(/,/g, ""), 10);
-
-      return `${symbol}${min.toLocaleString()} – ${symbol}${max.toLocaleString()} / qtl`;
-    }
-
-    // ✅ AANAK case (calculate from grades)
-    if (product.grades) {
+    // ✅ FIRST: AANAK ONLY
+    if (product.brand === "AANAK" && product.grades) {
       let prices = [];
 
       product.grades.forEach((g) => {
@@ -165,9 +153,21 @@ const ProductCard = ({
       }
     }
 
+    // ✅ SECOND: SIEA ONLY
+    if (product.brand === "SIEA" && product.price && typeof product.price === "string") {
+      const numbers = product.price.match(/[\d,]+/g);
+      if (!numbers || numbers.length < 2) return product.price;
+
+      const [minStr, maxStr] = numbers;
+      const min = parseInt(minStr.replace(/,/g, ""), 10);
+      const max = parseInt(maxStr.replace(/,/g, ""), 10);
+
+      return `${symbol}${min.toLocaleString()} – ${symbol}${max.toLocaleString()} / qtl`;
+    }
+
     return "Price on request";
   };
-
+  
   const displayPrice = formatPriceWithCurrency();
 
   const handleViewDetails = (e) => {
